@@ -1,1 +1,1 @@
-# quantum-mini-apps
+# Quantum Mini-apps
