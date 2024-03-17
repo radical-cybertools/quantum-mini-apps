@@ -22,7 +22,9 @@ pilot_compute_description_dask = {
     "walltime": 180,
     "project": "m4408",
     "number_of_nodes": NUMBER_NODES,
-    "scheduler_script_commands": ["#SBATCH --constraint=gpu", f"#SBATCH --gpus={num_gpus}", "#SBATCH -C \"gpu&hbm80g\""]
+    "scheduler_script_commands": ["#SBATCH --constraint=gpu",
+                                  f"#SBATCH --gpus={num_gpus}",
+                                  "#SBATCH -C \"gpu&hbm80g\""]
 }
 
 def start_pilot():
