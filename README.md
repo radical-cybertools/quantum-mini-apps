@@ -14,8 +14,8 @@ The framework can connect to existing Dask Clusters by providing scheduler url. 
 
 Architecture
 ----
-[mini-app-arch.pdf](..%2FDownloads%2Fmini-app-arch.pdf)
 
+[mini-app-arch.pdf](https://github.com/radical-cybertools/quantum-mini-apps/files/14813839/mini-app-arch.pdf)
 
 
 
