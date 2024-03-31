@@ -40,7 +40,7 @@ class DaskExecutor(Executor):
     def __init__(self, cluster_config=None):
         super().__init__()
         self.cluster_config = cluster_config or {}
-        self.client = initialize_client(self.cluster_config)
+        self.client = initialize_client(self.cluster_config["config"])
 
     def close(self):
         self.client.close()
