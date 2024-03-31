@@ -64,3 +64,7 @@ Contributions to the Quantum Mini-Apps framework are welcome! If you encounter a
 
 This project is licensed under the [MIT License](LICENSE).
 
+
+## Resources
+
+[Using Dask on Perlmutter](https://gitlab.com/NERSC/nersc-notebooks/-/tree/main/perlmutter/dask#using-dask-on-perlmutter)
