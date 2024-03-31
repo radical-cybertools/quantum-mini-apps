@@ -12,6 +12,9 @@ def initialize_client(cluster_config):
         # Connect to an existing remote cluster
         address = cluster_config["address"]
         client = Client(address)
+    elif "scheduler_file" in cluster_config:
+        # Connect to an existing remote cluster
+        client = Client(scheduler_file=cluster_config["scheduler_file"])
     else:
         cluster_type = cluster_config.get("type", "local")
 
