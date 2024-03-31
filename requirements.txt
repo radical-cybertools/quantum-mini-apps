@@ -1,0 +1,8 @@
+dask
+dask-cuda
+distributed
+mpi4py
+pennylane
+qiskit
+qiskit-aer
+qiskit-aer-gpu
