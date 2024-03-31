@@ -1,6 +1,10 @@
+import os
+import time
+
 import dask.bag as db
 from qiskit_aer.primitives import Estimator as AirEstimator
 
+from metrics.csv_writer import MetricsFileWriter
 from motifs.base_motif import Motif
 from motifs.qiskit_benchmark import generate_data
 
@@ -19,6 +23,8 @@ class CircuitExecutionBuilder:
         self.circuit_depth = 1
         self.size_of_observable = 1
         self.qiskit_backend_options = {"method": "statevector"}
+        home_dir = os.environ['HOME']
+        self.result_file=f"{home_dir}/result.csv"
 
     def set_depth_of_recursion(self, depth_of_recursion):
         self.depth_of_recursion = depth_of_recursion
@@ -44,20 +50,28 @@ class CircuitExecutionBuilder:
         self.qiskit_backend_options = qiskit_backend_options
         return self
 
+    def result_file(self, result_file):
+        self.result_file = result_file
+        return self
+
     def build(self, executor):
         return CircuitExecution(executor, self.depth_of_recursion, self.num_qubits, self.n_entries, self.circuit_depth,
-                                self.size_of_observable, self.qiskit_backend_options)
+                                self.size_of_observable, self.qiskit_backend_options, self.result_file)
 
 
 class CircuitExecution(Motif):
     def __init__(self, executor, depth_of_recursion, num_qubits, n_entries, circuit_depth, size_of_observable,
-                 qiskit_backend_options):
+                 qiskit_backend_options, result_file):
         super().__init__(executor, num_qubits)
         self.depth_of_recursion = depth_of_recursion
         self.n_entries = n_entries
         self.circuit_depth = circuit_depth
         self.size_of_observable = size_of_observable
         self.qiskit_backend_options = qiskit_backend_options
+        self.result_file = result_file
+        header = ["num_qubits", "n_entries", "circuit_depth", "size_of_observable", "depth_of_recursion",
+                  "compute_time_ms"]
+        self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
 
 
     def run(self):
@@ -76,7 +90,17 @@ class CircuitExecution(Motif):
         futures = self.executor.submit_tasks(circuit_bag, run_circuit, self.qiskit_backend_options)
 
         # wait for the tasks to complete
+        start_time = time.time()
         self.executor.wait(futures)
+        end_time = time.time()
+        compute_time_ms = end_time-start_time
+        self.metrics_file_writer.write([self.num_qubits, self.n_entries, self.circuit_depth,
+                                        self.size_of_observable, self.depth_of_recursion,
+                                        compute_time_ms])
+
+        self.metrics_file_writer.close()
+
+
 
 
 SIZE_OF_OBSERVABLE = "size_of_observable"

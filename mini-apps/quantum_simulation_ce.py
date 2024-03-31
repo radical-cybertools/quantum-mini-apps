@@ -2,6 +2,9 @@ from executor.manager import MiniAppExecutor
 from motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSERVABLE, CIRCUIT_DEPTH, \
     NUM_ENTRIES, QUBITS
 
+import logging
+logger = logging.getLogger("distributed.worker")
+
 
 class QuantumSimulation:
     def __init__(self, cluster_config, parameters=None):
