@@ -22,12 +22,14 @@ from qiskit.primitives import Estimator
 from qiskit.providers import Backend
 from qiskit.providers.fake_provider import ConfigurableFakeBackend
 from qiskit.quantum_info.random import random_pauli_list
-#from quantum_serverless import QuantumServerless, get, distribute_task, put
+
+
+# from quantum_serverless import QuantumServerless, get, distribute_task, put
 
 
 # @distribute_task()
 def generate_circuits(
-    depth_of_recursion: int, num_qubits: int, depth_of_circuit: int, n_circuits: int
+        depth_of_recursion: int, num_qubits: int, depth_of_circuit: int, n_circuits: int
 ):
     """Generates random circuits."""
     circuits = [random_circuit(num_qubits, depth_of_circuit) for _ in range(n_circuits)]
@@ -35,12 +37,13 @@ def generate_circuits(
         return circuits
     else:
         return circuits + generate_circuits(
-                depth_of_recursion - 1, num_qubits, depth_of_circuit, n_circuits
-            )
+            depth_of_recursion - 1, num_qubits, depth_of_circuit, n_circuits
+        )
+
 
 # @distribute_task()
 def generate_observables(
-    depth_of_recursion: int, num_qubits: int, size: int, n_observables: int
+        depth_of_recursion: int, num_qubits: int, size: int, n_observables: int
 ):
     """Generated random observables."""
     observables = [random_pauli_list(num_qubits, size) for _ in range(n_observables)]
@@ -52,23 +55,23 @@ def generate_observables(
 
 # @distribute_task()
 def generate_data(
-    depth_of_recursion: int,
-    num_qubits: int,
-    n_entries: int,
-    circuit_depth: int = 2,
-    size_of_observable: int = 2,
+        depth_of_recursion: int,
+        num_qubits: int,
+        n_entries: int,
+        circuit_depth: int = 2,
+        size_of_observable: int = 2,
 ):
     return generate_circuits(
-            depth_of_recursion=depth_of_recursion,
-            num_qubits=num_qubits,
-            n_circuits=n_entries,
-            depth_of_circuit=circuit_depth,
-        ), generate_observables(
-            depth_of_recursion=depth_of_recursion,
-            num_qubits=num_qubits,
-            size=size_of_observable,
-            n_observables=n_entries,
-        )
+        depth_of_recursion=depth_of_recursion,
+        num_qubits=num_qubits,
+        n_circuits=n_entries,
+        depth_of_circuit=circuit_depth,
+    ), generate_observables(
+        depth_of_recursion=depth_of_recursion,
+        num_qubits=num_qubits,
+        size=size_of_observable,
+        n_observables=n_entries,
+    )
 
 
 def get_backends(n_backends: int, num_qubits: int):
@@ -79,7 +82,7 @@ def get_backends(n_backends: int, num_qubits: int):
 
 # @distribute_task()
 def transpile_remote(
-    circuits: List[QuantumCircuit], backend: Backend
+        circuits: List[QuantumCircuit], backend: Backend
 ) -> List[QuantumCircuit]:
     """Transpiles circuits against backend."""
     return transpile(circuits, backend)
@@ -93,24 +96,24 @@ def estimate(circuits: list, observables: list):
 
 # @distribute_task()
 def run_graph(
-    depth_of_recursion: int,
-    num_qubits: int,
-    n_entries: int,
-    circuit_depth: int,
-    size_of_observable: int,
-    n_backends: int,
+        depth_of_recursion: int,
+        num_qubits: int,
+        n_entries: int,
+        circuit_depth: int,
+        size_of_observable: int,
+        n_backends: int,
 ):
     backends = get_backends(n_backends, num_qubits)
 
-    circuits, observables =  generate_data(
-            depth_of_recursion=depth_of_recursion,
-            num_qubits=num_qubits,
-            n_entries=n_entries,
-            circuit_depth=circuit_depth,
-            size_of_observable=size_of_observable,
-        )
+    circuits, observables = generate_data(
+        depth_of_recursion=depth_of_recursion,
+        num_qubits=num_qubits,
+        n_entries=n_entries,
+        circuit_depth=circuit_depth,
+        size_of_observable=size_of_observable,
+    )
 
-    #observables_ref = put(observables)
+    # observables_ref = put(observables)
 
     results = []
     for backend in backends:
@@ -148,7 +151,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     t0: float = time.time()
-    results= run_graph(
+    results = run_graph(
         depth_of_recursion=args.depth_of_recursion,
         num_qubits=args.num_qubits,
         n_entries=args.n_entries,
