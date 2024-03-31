@@ -16,8 +16,8 @@ if __name__ == "__main__":
     cluster_info = {
         "executor": "dask",
         "config": {
-            "type": "local",
-            "local": {
+            "type": "quantum-simulation",
+            "quantum-simulation": {
                 "n_workers": 4,
                 "threads_per_worker": 2,
                 "memory_limit": "4GB"

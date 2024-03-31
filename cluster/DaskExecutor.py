@@ -21,12 +21,12 @@ def initialize_client(cluster_config):
         # Connect to an existing remote cluster
         client = Client(scheduler_file=cluster_config["scheduler_file"])
     else:
-        cluster_type = cluster_config.get("type", "local")
+        cluster_type = cluster_config.get("type", "quantum-simulation")
 
-        if cluster_type == "local":
-            cluster = LocalCluster(**cluster_config.get("local", {}))
-        elif cluster_type == "local-cuda":
-            cluster = LocalCUDACluster(**cluster_config.get("local", {}))
+        if cluster_type == "quantum-simulation":
+            cluster = LocalCluster(**cluster_config.get("quantum-simulation", {}))
+        elif cluster_type == "quantum-simulation-cuda":
+            cluster = LocalCUDACluster(**cluster_config.get("quantum-simulation", {}))
         else:
             raise ValueError(f"Unsupported cluster type: {cluster_type}")
 
