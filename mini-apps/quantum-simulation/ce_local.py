@@ -1,5 +1,4 @@
 import os
-from executor.manager import MiniAppExecutor
 from motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSERVABLE, CIRCUIT_DEPTH, \
     NUM_ENTRIES, QUBITS
 
@@ -27,8 +26,8 @@ if __name__ == "__main__":
     cluster_info = {
         "executor": "dask",
         "config": {
-            "type": "quantum-simulation",
-            "quantum-simulation": {
+            "type": "local",
+            "local": {
                 "n_workers": 4,
                 "threads_per_worker": 2,
                 "memory_limit": "4GB"

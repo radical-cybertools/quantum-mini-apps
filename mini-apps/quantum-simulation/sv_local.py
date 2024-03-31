@@ -1,4 +1,3 @@
-from executor.manager import MiniAppExecutor
 from motifs.dist_state_vector_motif import DistStateVector
 
 
@@ -16,8 +15,8 @@ if __name__ == "__main__":
     cluster_info = {
         "executor": "dask",
         "config": {
-            "type": "quantum-simulation",
-            "quantum-simulation": {
+            "type": "local",
+            "local": {
                 "n_workers": 4,
                 "threads_per_worker": 2,
                 "memory_limit": "4GB"

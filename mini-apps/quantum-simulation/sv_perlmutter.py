@@ -17,7 +17,7 @@ class QuantumSimulation:
 if __name__ == "__main__":
     scheduler_file = os.path.join(os.environ["SCRATCH"], "scheduler_file.json")
     cluster_info = {
-        "executor": "dask",
+        "mini-app-executor": "dask",
         "config": {
             "scheduler_file": scheduler_file
         }
