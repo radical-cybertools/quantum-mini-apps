@@ -5,6 +5,8 @@ from motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSE
     NUM_ENTRIES, QUBITS
 
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 class QuantumSimulation:
     def __init__(self, cluster_config, parameters=None):
         self.executor = MiniAppExecutor(cluster_config).get_executor()
@@ -16,6 +18,7 @@ class QuantumSimulation:
             .set_n_entries(self.parameters[NUM_ENTRIES]) \
             .set_circuit_depth(self.parameters[CIRCUIT_DEPTH]) \
             .set_size_of_observable(self.parameters[SIZE_OF_OBSERVABLE]) \
+            .result_file(os.path.join(SCRIPT_DIR, "result.csv")) \
             .build(self.executor)
 
         ce.run()
