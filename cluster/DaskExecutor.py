@@ -1,7 +1,12 @@
 import os
 
 import dask
-from dask_cuda import LocalCUDACluster
+
+try:
+    from dask_cuda import LocalCUDACluster
+except:
+    print("Failed to import dask cuda..")
+
 from distributed import LocalCluster, Client, wait
 
 from cluster.base_executor import Executor

@@ -3,6 +3,6 @@ dask-cuda
 distributed
 mpi4py
 pennylane
-qiskit
-qiskit-aer
+qiskit==0.45.0
+qiskit-aer==0.13.2
 qiskit-aer-gpu

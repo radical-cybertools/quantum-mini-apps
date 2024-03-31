@@ -52,7 +52,7 @@ class CircuitExecutionBuilder:
 class CircuitExecution(Motif):
     def __init__(self, executor, depth_of_recursion, num_qubits, n_entries, circuit_depth, size_of_observable,
                  qiskit_backend_options):
-        super().__init__(executor, num_qubits, shots)
+        super().__init__(executor, num_qubits)
         self.depth_of_recursion = depth_of_recursion
         self.n_entries = n_entries
         self.circuit_depth = circuit_depth
