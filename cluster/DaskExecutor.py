@@ -31,6 +31,8 @@ def initialize_client(cluster_config):
             raise ValueError(f"Unsupported cluster type: {cluster_type}")
 
         client = Client(cluster)
+
+    print(client.scheduler_info())
     return client
 
 
