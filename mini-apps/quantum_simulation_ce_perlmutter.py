@@ -18,7 +18,7 @@ class QuantumSimulation:
             .set_n_entries(self.parameters[NUM_ENTRIES]) \
             .set_circuit_depth(self.parameters[CIRCUIT_DEPTH]) \
             .set_size_of_observable(self.parameters[SIZE_OF_OBSERVABLE]) \
-            .result_file(os.path.join(SCRIPT_DIR, "result.csv")) \
+            .set_result_file(os.path.join(SCRIPT_DIR, "result.csv")) \
             .build(self.executor)
 
         ce.run()

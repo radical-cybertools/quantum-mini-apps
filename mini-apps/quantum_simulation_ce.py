@@ -1,9 +1,9 @@
+import os
 from executor.manager import MiniAppExecutor
 from motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSERVABLE, CIRCUIT_DEPTH, \
     NUM_ENTRIES, QUBITS
 
-import logging
-logger = logging.getLogger("distributed.worker")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class QuantumSimulation:
@@ -17,6 +17,7 @@ class QuantumSimulation:
             .set_n_entries(self.parameters[NUM_ENTRIES]) \
             .set_circuit_depth(self.parameters[CIRCUIT_DEPTH]) \
             .set_size_of_observable(self.parameters[SIZE_OF_OBSERVABLE]) \
+            .set_result_file(os.path.join(SCRIPT_DIR, "result.csv")) \
             .build(self.executor)
 
         ce.run()

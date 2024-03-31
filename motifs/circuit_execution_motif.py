@@ -50,7 +50,7 @@ class CircuitExecutionBuilder:
         self.qiskit_backend_options = qiskit_backend_options
         return self
 
-    def result_file(self, result_file):
+    def set_result_file(self, result_file):
         self.result_file = result_file
         return self
 
