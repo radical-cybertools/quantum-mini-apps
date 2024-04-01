@@ -1,4 +1,6 @@
 import os
+
+from miniapp.manager import MiniAppExecutor
 from motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSERVABLE, CIRCUIT_DEPTH, \
     NUM_ENTRIES, QUBITS
 

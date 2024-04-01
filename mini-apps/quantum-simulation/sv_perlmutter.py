@@ -1,6 +1,6 @@
 import os
 
-from executor.manager import MiniAppExecutor
+from miniapp.manager import MiniAppExecutor
 from motifs.dist_state_vector_motif import DistStateVector
 
 
@@ -17,7 +17,7 @@ class QuantumSimulation:
 if __name__ == "__main__":
     scheduler_file = os.path.join(os.environ["SCRATCH"], "scheduler_file.json")
     cluster_info = {
-        "mini-app-executor": "dask",
+        "executor": "dask",
         "config": {
             "scheduler_file": scheduler_file
         }

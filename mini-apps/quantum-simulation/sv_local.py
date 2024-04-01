@@ -1,3 +1,4 @@
+from miniapp.manager import MiniAppExecutor
 from motifs.dist_state_vector_motif import DistStateVector
 
 
