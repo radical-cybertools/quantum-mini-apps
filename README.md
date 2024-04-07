@@ -17,7 +17,7 @@ The main components of the framework are:
 Architecture
 ----
 
-![mini-app-arch](https://github.com/radical-cybertools/quantum-mini-apps/assets/1332034/ea8b6dd6-5a52-442c-bb6f-a3f845c06658)
+![mini-app-arch](https://github.com/radical-cybertools/quantum-mini-apps/files/14898257/mini-app-arch.1.pdf)
 
 
 ## Getting Started
