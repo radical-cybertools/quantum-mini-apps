@@ -40,7 +40,9 @@ pip install -r requirements.txt
 python mini-apps/quantum-simulation/ce_local.py
 ```
 
-his will execute the `QuantumSimulation` Mini-App with the default configuration, which runs a circuit execution motif on a local Dask cluster.
+This will execute the `QuantumSimulation` Mini-App with the default configuration, which runs a circuit execution motif on a local Dask cluster.
+
+To run on Perlmutter, follow [Using Dask on Perlmutter](https://gitlab.com/NERSC/nersc-notebooks/-/tree/main/perlmutter/dask#using-dask-on-perlmutter) to provision dask cluster, and run ```python mini-apps/quantum-simulation/ce_perlmutter.py``` against the running Perlmutter dask cluster.
 
 ## Customization
 
