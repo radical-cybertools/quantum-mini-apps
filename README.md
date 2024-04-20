@@ -26,7 +26,7 @@ To get started with the Quantum Mini-Apps framework, follow these steps:
 
 1. Clone the repository:
 ```commandline
-git clone https://github.com/your-repo/quantum-mini-apps.git
+git clone https://github.com/radical-cybertools/quantum-mini-apps.git
 ```
 
 2. Install the required dependencies:
