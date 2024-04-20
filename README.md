@@ -37,7 +37,7 @@ pip install -r requirements.txt
 3. Run the provided example Mini-App:
 
 ```commandline
-python mini-apps/quantum-simulation-ce.py
+python mini-apps/quantum-simulation/ce_local.py
 ```
 
 his will execute the `QuantumSimulation` Mini-App with the default configuration, which runs a circuit execution motif on a local Dask cluster.
