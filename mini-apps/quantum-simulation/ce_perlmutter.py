@@ -2,7 +2,7 @@ import os
 
 from miniappengine.manager import MiniAppExecutor
 from miniappengine.motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSERVABLE, CIRCUIT_DEPTH, \
-    NUM_ENTRIES, QUBITS
+    NUM_ENTRIES, QUBITS, QISKIT_BACKEND_OPTIONS
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -18,6 +18,7 @@ class QuantumSimulation:
             .set_n_entries(self.parameters[NUM_ENTRIES]) \
             .set_circuit_depth(self.parameters[CIRCUIT_DEPTH]) \
             .set_size_of_observable(self.parameters[SIZE_OF_OBSERVABLE]) \
+            .set_qiskit_backend_options(self.parameters[QISKIT_BACKEND_OPTIONS]) \
             .set_result_file(os.path.join(SCRIPT_DIR, "result.csv")) \
             .build(self.executor)
 
@@ -34,10 +35,11 @@ if __name__ == "__main__":
     }
 
     ce_parameters = {
-        QUBITS: 10,
-        NUM_ENTRIES: 10,
+        QUBITS: 25,
+        NUM_ENTRIES: 1024,
         CIRCUIT_DEPTH: 1,
-        SIZE_OF_OBSERVABLE: 1
+        SIZE_OF_OBSERVABLE: 1,
+        QISKIT_BACKEND_OPTIONS: {"method": "statevector", "device": 'GPU', "cuStateVec_enable": True, "shots": None}
     }
 
     qs = QuantumSimulation(cluster_info, ce_parameters)

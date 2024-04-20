@@ -4,7 +4,7 @@ import time
 import dask.bag as db
 from qiskit_aer.primitives import Estimator as AirEstimator
 
-from miniappengine.metrics import MetricsFileWriter
+from miniappengine.metrics.csv_writer import MetricsFileWriter
 from miniappengine.motifs.base_motif import Motif
 from miniappengine.motifs.qiskit_benchmark import generate_data
 
@@ -107,3 +107,4 @@ SIZE_OF_OBSERVABLE = "size_of_observable"
 CIRCUIT_DEPTH = "circuit_depth"
 NUM_ENTRIES = "num_entries"
 QUBITS = "qubits"
+QISKIT_BACKEND_OPTIONS = "qiskit_backend_options"
