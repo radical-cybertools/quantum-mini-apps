@@ -1,7 +1,7 @@
 import os
 
-from miniapp.manager import MiniAppExecutor
-from motifs.dist_state_vector_motif import DistStateVector
+from miniappengine.manager import MiniAppExecutor
+from miniappengine.motifs.dist_state_vector_motif import DistStateVector
 
 
 class QuantumSimulation:

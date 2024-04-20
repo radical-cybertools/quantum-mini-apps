@@ -9,7 +9,7 @@ except:
 
 from distributed import LocalCluster, Client, wait
 
-from cluster.base_executor import Executor
+from miniappengine.cluster.base_executor import Executor
 
 
 def initialize_client(cluster_config):

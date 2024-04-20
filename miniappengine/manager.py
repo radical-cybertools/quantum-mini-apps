@@ -1,4 +1,4 @@
-from cluster.dask_executor import DaskExecutor
+from miniappengine.cluster import DaskExecutor
 
 
 class MiniAppExecutor:
