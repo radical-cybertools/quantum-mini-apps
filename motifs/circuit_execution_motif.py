@@ -4,9 +4,9 @@ import time
 import dask.bag as db
 from qiskit_aer.primitives import Estimator as AirEstimator
 
-from miniappengine.metrics.csv_writer import MetricsFileWriter
-from miniappengine.motifs.base_motif import Motif
-from miniappengine.motifs.qiskit_benchmark import generate_data
+from engine.metrics.csv_writer import MetricsFileWriter
+from motifs.base_motif import Motif
+from motifs.qiskit_benchmark import generate_data
 
 
 def run_circuit(circ_obs, qiskit_backend_options):

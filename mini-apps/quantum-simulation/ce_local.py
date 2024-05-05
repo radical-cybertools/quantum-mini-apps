@@ -1,7 +1,7 @@
 import os
 
-from miniappengine.manager import MiniAppExecutor
-from miniappengine.motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSERVABLE, CIRCUIT_DEPTH, \
+from engine.manager import MiniAppExecutor
+from motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSERVABLE, CIRCUIT_DEPTH, \
     NUM_ENTRIES, QUBITS
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

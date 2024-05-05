@@ -4,7 +4,7 @@ import pennylane as qml
 from mpi4py import MPI
 from pennylane import numpy as np
 
-from miniappengine.motifs.base_motif import Motif
+from motifs.base_motif import Motif
 
 
 def run_script(**parameters):
