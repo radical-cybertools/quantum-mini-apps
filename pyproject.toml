@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "quantum-mini-apps"
+version = "0.1.0"
+description = "Framework for Developing Mini Applications for Quantum-HPC Systems"
+authors = ["Pradeep Mantha, Nishant Saurabh, Florian Kiwit, Shantenu Jha, Andre Luckow"]
+readme = "README.md"
+packages = [
+     { include = "engine", from = "src" },
+     { include = "mini_apps", from = "src" }     
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+qugen = {git = "https://github.com/drelu/qugen"}
+pennylane = { version = "*"}
+pilot-quantum = {git = "https://github.com/radical-cybertools/pilot-quantum.git"}
+dask = "2024.7.1"
+distributed = "2024.7.1"
+qiskit = " 1.1.1"
+qiskit-aer = "0.14.2"
+qiskit_ibm_runtime = "*"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

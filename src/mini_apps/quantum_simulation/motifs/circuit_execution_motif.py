@@ -3,6 +3,7 @@ import time
 
 import dask.bag as db
 from qiskit_aer.primitives import Estimator as AirEstimator
+from qiskit.quantum_info import Pauli
 
 from engine.metrics.csv_writer import MetricsFileWriter
 from motifs.base_motif import Motif
@@ -10,7 +11,7 @@ from motifs.qiskit_benchmark import generate_data
 
 
 def run_circuit(circ_obs, qiskit_backend_options):
-    estimator_result = AirEstimator(backend_options=qiskit_backend_options).run(circ_obs[0], circ_obs[1]).result()
+    estimator_result = AirEstimator(backend_options=qiskit_backend_options).run(circ_obs[0], Pauli(circ_obs[1])).result()
     print(estimator_result)
     return estimator_result
 
