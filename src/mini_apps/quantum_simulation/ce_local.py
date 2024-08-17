@@ -1,7 +1,7 @@
 import os
 
 from engine.manager import MiniAppExecutor
-from motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSERVABLE, CIRCUIT_DEPTH, \
+from mini_apps.quantum_simulation.motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSERVABLE, CIRCUIT_DEPTH, \
     NUM_ENTRIES, QUBITS
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -44,6 +44,7 @@ if __name__ == "__main__":
         CIRCUIT_DEPTH: 1,
         SIZE_OF_OBSERVABLE: 1
     }
+
 
     qs = QuantumSimulation(cluster_info, ce_parameters)
     qs.run()

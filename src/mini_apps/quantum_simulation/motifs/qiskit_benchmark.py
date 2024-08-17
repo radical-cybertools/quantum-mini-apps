@@ -17,10 +17,10 @@ import time
 from typing import List
 
 from qiskit import QuantumCircuit, transpile
-from qiskit.circuit.random import random_circuit
-from qiskit.primitives import Estimator
-from qiskit.providers import Backend
-from qiskit.providers.fake_provider import ConfigurableFakeBackend
+from qiskit.circuit.random.utils import random_circuit
+# from qiskit.primitives import Estimator
+# from qiskit.providers import Backend
+# from qiskit.providers.fake_provider import ConfigurableFakeBackend
 from qiskit.quantum_info.random import random_pauli_list
 
 
@@ -74,52 +74,52 @@ def generate_data(
     )
 
 
-def get_backends(n_backends: int, num_qubits: int):
-    """Returns list of backends for program."""
-    backend = ConfigurableFakeBackend("Tashkent", n_qubits=num_qubits, version=1)
-    return [backend for _ in range(n_backends)]
+# def get_backends(n_backends: int, num_qubits: int):
+#     """Returns list of backends for program."""
+#     backend = ConfigurableFakeBackend("Tashkent", n_qubits=num_qubits, version=1)
+#     return [backend for _ in range(n_backends)]
 
 
 # @distribute_task()
-def transpile_remote(
-        circuits: List[QuantumCircuit], backend: Backend
-) -> List[QuantumCircuit]:
-    """Transpiles circuits against backend."""
-    return transpile(circuits, backend)
+# def transpile_remote(
+#         circuits: List[QuantumCircuit], backend: Backend
+# ) -> List[QuantumCircuit]:
+#     """Transpiles circuits against backend."""
+#     return transpile(circuits, backend)
+
+
+# # @distribute_task()
+# def estimate(circuits: list, observables: list):
+#     """Estimates expectation values of given circuit."""
+#     return Estimator().run(circuits, observables).result()
 
 
 # @distribute_task()
-def estimate(circuits: list, observables: list):
-    """Estimates expectation values of given circuit."""
-    return Estimator().run(circuits, observables).result()
+# def run_graph(
+#         depth_of_recursion: int,
+#         num_qubits: int,
+#         n_entries: int,
+#         circuit_depth: int,
+#         size_of_observable: int,
+#         n_backends: int,
+# ):
+#     backends = get_backends(n_backends, num_qubits)
 
+#     circuits, observables = generate_data(
+#         depth_of_recursion=depth_of_recursion,
+#         num_qubits=num_qubits,
+#         n_entries=n_entries,
+#         circuit_depth=circuit_depth,
+#         size_of_observable=size_of_observable,
+#     )
 
-# @distribute_task()
-def run_graph(
-        depth_of_recursion: int,
-        num_qubits: int,
-        n_entries: int,
-        circuit_depth: int,
-        size_of_observable: int,
-        n_backends: int,
-):
-    backends = get_backends(n_backends, num_qubits)
+#     # observables_ref = put(observables)
 
-    circuits, observables = generate_data(
-        depth_of_recursion=depth_of_recursion,
-        num_qubits=num_qubits,
-        n_entries=n_entries,
-        circuit_depth=circuit_depth,
-        size_of_observable=size_of_observable,
-    )
+#     results = []
+#     for backend in backends:
+#         results.append(estimate(transpile_remote(circuits, backend), observables))
 
-    # observables_ref = put(observables)
-
-    results = []
-    for backend in backends:
-        results.append(estimate(transpile_remote(circuits, backend), observables))
-
-    return results
+#     return results
 
 
 if __name__ == "__main__":
