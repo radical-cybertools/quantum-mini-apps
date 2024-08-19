@@ -48,7 +48,7 @@ To run on Perlmutter, follow [Using Dask on Perlmutter](https://gitlab.com/NERSC
 
 To customize the framework or develop your own Mini-Apps, you can follow these sample steps:
 
-1. **Implement a new Motif**: Create a new class that inherits from the `Motif` base class and implement the `run` method to define the quantum computing task or algorithm.
+1. **Implement a new Mini-App**: Create a new class that inherits from the `Motif` base class and implement the `run` method to define the quantum computing task or algorithm.
 
 2. **Configure the Motif**: Use the provided builder classes (e.g., `CircuitExecutionBuilder`) to configure the motif with the desired parameters.
 
