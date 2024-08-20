@@ -1,13 +1,13 @@
 import os
 import time
 
-import dask.bag as db
+
 from qiskit_aer.primitives import Estimator as AirEstimator
 from qiskit.quantum_info import Pauli
 
 from engine.metrics.csv_writer import MetricsFileWriter
-from motifs.base_motif import Motif
-from motifs.qiskit_benchmark import generate_data
+from mini_apps.quantum_simulation.motifs.base_motif import Motif
+from mini_apps.quantum_simulation.motifs.qiskit_benchmark import generate_data
 
 
 def run_circuit(circ_obs, qiskit_backend_options):
@@ -85,10 +85,9 @@ class CircuitExecution(Motif):
         )
 
         circuits_observables = zip(circuits, observables)
-        circuit_bag = db.from_sequence(circuits_observables)
-
+        
         # Submit all the tasks
-        futures = self.executor.submit_tasks(circuit_bag, run_circuit, self.qiskit_backend_options)
+        futures = self.executor.submit_tasks(run_circuit, circuits_observables, self.qiskit_backend_options)
 
         # wait for the tasks to complete
         start_time = time.time()

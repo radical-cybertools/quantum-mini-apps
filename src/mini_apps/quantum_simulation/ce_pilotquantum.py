@@ -23,6 +23,9 @@ class QuantumSimulation:
             .build(self.executor)
 
         ce.run()
+    
+    def close(self):
+        self.executor.close()
 
 
 if __name__ == "__main__":
@@ -35,7 +38,7 @@ if __name__ == "__main__":
         "config": {
             "resource": RESOURCE_URL_HPC,
             "working_directory": WORKING_DIRECTORY,
-            "type": "dask",
+            "type": "ray",
             "number_of_nodes": 1,
             "cores_per_node": 2,
             "gpus_per_node": 0,
@@ -52,7 +55,7 @@ if __name__ == "__main__":
         NUM_ENTRIES: 1024,
         CIRCUIT_DEPTH: 1,
         SIZE_OF_OBSERVABLE: 1,
-        QISKIT_BACKEND_OPTIONS: {"method": "statevector", "device": 'GPU', "cuStateVec_enable": True, "shots": None}
+        QISKIT_BACKEND_OPTIONS: {"method": "statevector", "device": 'CPU', "cuStateVec_enable": True, "shots": None}
     }
 
     qs = QuantumSimulation(cluster_info, ce_parameters)

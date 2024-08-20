@@ -8,7 +8,7 @@ class MiniAppExecutor:
 
     def get_executor(self):
         executor_type = self.cluster_config.get("executor", "dask")
-
+        # executor 
         if executor_type == "pilot":
             return PilotQuantumExecutor(self.cluster_config)
         if executor_type == "dask":
