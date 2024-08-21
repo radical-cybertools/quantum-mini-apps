@@ -34,7 +34,7 @@ class CircuitExecutionBuilder:
         self.current_datetime = datetime.datetime.now()
         self.file_name = f"result_{self.current_datetime.strftime('%Y%m%d_%H%M%S')}.csv"
         self.result_file = os.path.join(self.result_dir, self.file_name)
-
+        self.cluster_info = None    
         # self.result_file=f"{home_dir}/result.csv"
 
     def set_depth_of_recursion(self, depth_of_recursion):
@@ -66,14 +66,18 @@ class CircuitExecutionBuilder:
         self.result_file = os.path.join(self.result_dir, self.file_name)
         return self
 
+    def set_cluster_info(self, cluster_info):
+        self.cluster_info = cluster_info
+        return self
+
     def build(self, executor):
         return CircuitExecution(executor, self.depth_of_recursion, self.num_qubits, self.n_entries, self.circuit_depth,
-                                self.size_of_observable, self.qiskit_backend_options, self.result_file, self.current_datetime)
+                                self.size_of_observable, self.qiskit_backend_options, self.result_file, self.current_datetime, self.cluster_info)
 
 
 class CircuitExecution(Motif):
     def __init__(self, executor, depth_of_recursion, num_qubits, n_entries, circuit_depth, size_of_observable,
-                 qiskit_backend_options, result_file, timestamp):
+                 qiskit_backend_options, result_file, timestamp, cluster_info):
         super().__init__(executor, num_qubits)
         self.depth_of_recursion = depth_of_recursion
         self.n_entries = n_entries
@@ -82,8 +86,9 @@ class CircuitExecution(Motif):
         self.qiskit_backend_options = qiskit_backend_options
         self.result_file = result_file
         self.timestamp = timestamp
+        self.cluster_info = cluster_info
         header = ["timestamp", "num_qubits", "n_entries", "circuit_depth", "size_of_observable", "depth_of_recursion",
-                  "compute_time_ms", "quantum_options"]
+                  "compute_time_ms", "quantum_options", "cluster_info"]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
 
 
@@ -108,7 +113,7 @@ class CircuitExecution(Motif):
         compute_time_ms = end_time-start_time
         self.metrics_file_writer.write([self.timestamp, self.num_qubits, self.n_entries, self.circuit_depth,
                                         self.size_of_observable, self.depth_of_recursion,
-                                        compute_time_ms, str(self.qiskit_backend_options)])
+                                        compute_time_ms, str(self.qiskit_backend_options), str(self.cluster_info)])
 
         self.metrics_file_writer.close()
 
