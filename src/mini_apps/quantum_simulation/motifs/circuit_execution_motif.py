@@ -4,10 +4,15 @@ import time
 
 from qiskit_aer.primitives import Estimator as AirEstimator
 from qiskit.quantum_info import Pauli
+from qiskit_ionq import IonQProvider
+from qiskit.primitives import BackendEstimator, BackendSampler
+
+
 
 from engine.metrics.csv_writer import MetricsFileWriter
 from mini_apps.quantum_simulation.motifs.base_motif import Motif
 from mini_apps.quantum_simulation.motifs.qiskit_benchmark import generate_data
+import datetime
 
 
 def run_circuit(circ_obs, qiskit_backend_options):
@@ -24,8 +29,13 @@ class CircuitExecutionBuilder:
         self.circuit_depth = 1
         self.size_of_observable = 1
         self.qiskit_backend_options = {"method": "statevector"}
-        home_dir = os.environ['HOME']
-        self.result_file=f"{home_dir}/result.csv"
+        self.result_dir = os.environ['HOME']
+        # create a date-time based file name
+        self.current_datetime = datetime.datetime.now()
+        self.file_name = f"result_{self.current_datetime.strftime('%Y%m%d_%H%M%S')}.csv"
+        self.result_file = os.path.join(self.result_dir, self.file_name)
+
+        # self.result_file=f"{home_dir}/result.csv"
 
     def set_depth_of_recursion(self, depth_of_recursion):
         self.depth_of_recursion = depth_of_recursion
@@ -51,18 +61,19 @@ class CircuitExecutionBuilder:
         self.qiskit_backend_options = qiskit_backend_options
         return self
 
-    def set_result_file(self, result_file):
-        self.result_file = result_file
+    def set_result_dir(self, result_dir):
+        self.result_dir = result_dir
+        self.result_file = os.path.join(self.result_dir, self.file_name)
         return self
 
     def build(self, executor):
         return CircuitExecution(executor, self.depth_of_recursion, self.num_qubits, self.n_entries, self.circuit_depth,
-                                self.size_of_observable, self.qiskit_backend_options, self.result_file)
+                                self.size_of_observable, self.qiskit_backend_options, self.result_file, self.current_datetime)
 
 
 class CircuitExecution(Motif):
     def __init__(self, executor, depth_of_recursion, num_qubits, n_entries, circuit_depth, size_of_observable,
-                 qiskit_backend_options, result_file):
+                 qiskit_backend_options, result_file, timestamp):
         super().__init__(executor, num_qubits)
         self.depth_of_recursion = depth_of_recursion
         self.n_entries = n_entries
@@ -70,8 +81,9 @@ class CircuitExecution(Motif):
         self.size_of_observable = size_of_observable
         self.qiskit_backend_options = qiskit_backend_options
         self.result_file = result_file
-        header = ["num_qubits", "n_entries", "circuit_depth", "size_of_observable", "depth_of_recursion",
-                  "compute_time_ms"]
+        self.timestamp = timestamp
+        header = ["timestamp", "num_qubits", "n_entries", "circuit_depth", "size_of_observable", "depth_of_recursion",
+                  "compute_time_ms", "quantum_options"]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
 
 
@@ -94,9 +106,9 @@ class CircuitExecution(Motif):
         self.executor.wait(futures)
         end_time = time.time()
         compute_time_ms = end_time-start_time
-        self.metrics_file_writer.write([self.num_qubits, self.n_entries, self.circuit_depth,
+        self.metrics_file_writer.write([self.timestamp, self.num_qubits, self.n_entries, self.circuit_depth,
                                         self.size_of_observable, self.depth_of_recursion,
-                                        compute_time_ms])
+                                        compute_time_ms, str(self.qiskit_backend_options)])
 
         self.metrics_file_writer.close()
 

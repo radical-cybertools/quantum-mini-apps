@@ -25,8 +25,9 @@ class PilotQuantumExecutor(Executor):
         self.pilot, self.client = initialize_client(self.cluster_config["config"])
 
     def close(self):
+        # self.client.close()
         self.pilot.cancel()
-        self.client.close()
+        
 
     def get_client(self):
         return self.client
