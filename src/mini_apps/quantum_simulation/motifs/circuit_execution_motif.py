@@ -88,7 +88,7 @@ class CircuitExecution(Motif):
         self.timestamp = timestamp
         self.cluster_info = cluster_info
         header = ["timestamp", "num_qubits", "n_entries", "circuit_depth", "size_of_observable", "depth_of_recursion",
-                  "compute_time_ms", "quantum_options", "cluster_info"]
+                  "compute_time_sec", "quantum_options", "cluster_info"]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
 
 
