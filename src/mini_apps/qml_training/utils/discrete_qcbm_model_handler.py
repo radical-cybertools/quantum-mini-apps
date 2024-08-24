@@ -1,3 +1,7 @@
+# This file is part of the Quantum Mini-Apps project, based on original work 
+# adapted from other open-source projects. Contributions made to this file 
+# are licensed under the terms of the Apache License, Version 2.0.
+
 # Copyright 2023 QUTAC, BASF Digital Solutions GmbH, BMW Group, 
 # Lufthansa Industry Solutions AS GmbH, Merck KGaA (Darmstadt, Germany), 
 # Munich Re, SAP SE.
@@ -25,16 +29,18 @@ import cma
 import warnings
 import pickle
 
-from typing import Optional
+from typing import Optional, Callable
 
 import numpy as np
 import jax
 import jax.numpy as jnp
 
+from pandas.core.api import DataFrame as DataFrame
 from qugen.main.generator.base_model_handler import BaseModelHandler
 from qugen.main.generator.quantum_circuits.discrete_generator_pennylane import generate_samples
 from qugen.main.data.data_handler import PITNormalizer, MinMaxNormalizer
 from qugen.main.data.helper import random_angle, kl_divergence
+from engine.metrics.csv_writer import MetricsFileWriter
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -85,6 +91,7 @@ class DiscreteQCBMModelHandler(BaseModelHandler):
         transformation='pit',
         hot_start_path='',
         save_artifacts=True,
+        parallelism_framework= "jax",
         slower_progress_update=False
     ) -> BaseModelHandler:
         """Build the discrete QCBM model.
@@ -119,6 +126,7 @@ class DiscreteQCBMModelHandler(BaseModelHandler):
         uniq = hashlib.md5(time_str).hexdigest()[:4]
         self.transformation = transformation
         self.circuit_type = circuit_type
+        self.parallelism_framework = parallelism_framework
 
         self.model_name = model_name + '_'  + self.data_set+ '_' + self.circuit_type + '_' + self.transformation+ '_' + 'qcbm_' + uniq 
 
@@ -257,6 +265,64 @@ class DiscreteQCBMModelHandler(BaseModelHandler):
 
 
     def evaluator(self, solutions):
+        if self.parallelism_framework=="sequential":
+            return self.evaluator_sequential(solutions)
+        elif self.parallelism_framework=="jax":
+            return self.evaluator_jax(solutions)
+
+
+    def evaluator_sequential(self, solutions):
+        """Computes the loss function for all candidate solutions from CMA sequentially.
+
+        Args:
+            solutions (list): List of the potential weights which the CMA algorithm has sampled.
+
+        Returns:
+            loss (list): List of all training losses corresponding to each entry in solutions.
+        """        
+        print("Using Jax Sequential Version")
+        # Split the random key
+        self.key, subkey = jax.random.split(self.key)
+
+        # Initialize the list to store binary samples
+        binary_samples = []
+
+        # Generate binary samples sequentially
+        for weights in solutions:
+            binary_sample = self.generator(
+                subkey,
+                weights,
+                n_shots=self.hist_samples,
+            )
+            binary_samples.append(binary_sample)
+
+        # Convert binary samples list to jnp.array
+        binary_samples = jnp.array(binary_samples)
+
+        # Initialize the list to store samples
+        samples = []
+
+        # Iterate over binary samples to generate samples sequentially
+        for binary_sample in binary_samples:
+            subkey, next_subkey = jax.random.split(subkey)
+            sample = generate_samples(next_subkey, binary_sample, self.n_registers, self.n_qubits, noisy=False)
+            samples.append(sample)
+
+        # Initialize the list to store losses
+        loss = []
+
+        # Calculate the loss sequentially for each sample
+        for sample in samples:
+            learned_histogram = jnp.histogramdd(sample, bins=self.all_bins, range=self.all_ranges)
+            learned_probability = learned_histogram[0]/jnp.sum(learned_histogram[0])
+            kl_loss = kl_divergence(self.true_probability, learned_probability)
+            loss.append(kl_loss)
+
+        # Convert loss to list and return
+        return loss.tolist()
+    
+
+    def evaluator_jax(self, solutions):
         """Computes the loss function for all candidate solutions from CMA
 
         Args:
@@ -265,7 +331,7 @@ class DiscreteQCBMModelHandler(BaseModelHandler):
         Returns:
             loss (list): List of all training losses corresponding to each entry in solutions.
         """        
-        
+        print("Using Jax Evaluator")
         self.key, subkey = jax.random.split(self.key)
 
         v_generator = jax.vmap(
