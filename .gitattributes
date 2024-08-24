@@ -1,1 +1,2 @@
 *.npy filter=lfs diff=lfs merge=lfs -text
+src/mini_apps/qml_data_compression/all_data.npy filter=lfs diff=lfs merge=lfs -text
