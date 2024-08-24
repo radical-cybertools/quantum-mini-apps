@@ -20,6 +20,7 @@
 # limitations under the License.
 
 # system imports
+import datetime
 import os
 import time
 
@@ -45,7 +46,15 @@ class QMLTrainingMiniApp:
         self.scenario_label = scenario_label
 
         self.model = None
-        self.file_name = f"qml_result_{self.current_datetime.strftime('%Y%m%d_%H%M%S')}.csv"
+        self.current_datetime = datetime.datetime.now()
+        self.timestamp = self.current_datetime.strftime('%Y-%m-%dT%H:%M:%S')
+        self.file_name = f"qml_result_{self.timestamp}.csv"
+
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # check whether dir exists if not create it
+        self.result_dir = os.path.join(script_dir, "results")
+        if not os.path.exists(self.result_dir):
+            os.makedirs(self.result_dir)
         self.result_file = os.path.join(self.result_dir, self.file_name)
         header = ["timestamp", "scenario_label", "num_qubits",  "compute_time_sec", "parameters", "cluster_info"]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
@@ -92,7 +101,7 @@ class QMLTrainingMiniApp:
 
     def run(self): 
          # Submit all the tasks
-        futures = self.executor.submit_tasks(self.run_training)
+        futures = self.executor.submit_tasks(self.run_training, [1])
 
         # wait for the tasks to complete
         start_time = time.time()
@@ -103,6 +112,9 @@ class QMLTrainingMiniApp:
                                         compute_time_ms, str(self.parameters), str(self.cluster_info)])
 
         self.metrics_file_writer.close()
+
+    def close(self): 
+        self.executor.close()
 
 
 if __name__ == "__main__":
@@ -147,11 +159,15 @@ if __name__ == "__main__":
         }
     }
 
-    qml_mini_app = QMLTrainingMiniApp(cluster_info, qml_parameters)
-    #qml_mini_app.update_parameters(qml_parameters)
-    qml_mini_app.run()
+    try:
 
-    qml_mini_app.close()
+        qml_mini_app = QMLTrainingMiniApp(cluster_info, qml_parameters)
+        #qml_mini_app.update_parameters(qml_parameters)
+        qml_mini_app.run()
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        qml_mini_app.close()
 
 
 

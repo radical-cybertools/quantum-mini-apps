@@ -40,7 +40,7 @@ from qugen.main.generator.base_model_handler import BaseModelHandler
 from qugen.main.generator.quantum_circuits.discrete_generator_pennylane import generate_samples
 from qugen.main.data.data_handler import PITNormalizer, MinMaxNormalizer
 from qugen.main.data.helper import random_angle, kl_divergence
-from engine.metrics.csv_writer import MetricsFileWriter
+
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl

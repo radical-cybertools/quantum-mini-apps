@@ -32,7 +32,7 @@ class CircuitExecutionBuilder:
         self.result_dir = os.environ['HOME']
         # create a date-time based file name
         self.current_datetime = datetime.datetime.now()
-        self.file_name = f"ce_result_{self.current_datetime.strftime('%Y%m%d_%H%M%S')}.csv"
+        self.file_name = f"ce_result_{self.current_datetime.strftime('%Y-%m-%dT%H:%M:%S')}.csv"
         self.result_file = os.path.join(self.result_dir, self.file_name)
         self.cluster_info = None    
         # self.result_file=f"{home_dir}/result.csv"
