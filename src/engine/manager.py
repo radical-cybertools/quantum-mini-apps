@@ -1,4 +1,5 @@
 from engine.cluster.dask_executor import DaskExecutor
+from engine.cluster.pilot_quantum_executor import PilotQuantumExecutor
 
 
 class MiniAppExecutor:
@@ -7,7 +8,9 @@ class MiniAppExecutor:
 
     def get_executor(self):
         executor_type = self.cluster_config.get("executor", "dask")
-
+        # executor 
+        if executor_type == "pilot":
+            return PilotQuantumExecutor(self.cluster_config)
         if executor_type == "dask":
             return DaskExecutor(self.cluster_config)
         # elif executor_type == "ray":
