@@ -1,6 +1,7 @@
 import os, dask, ray
 import pennylane as qml
 from pilot.pilot_compute_service import PilotComputeService
+from pilot.pilot_enums_exceptions import ExecutionEngine
 from distributed import Client, wait
 import dask.bag as db
 from engine.cluster.base_executor import Executor
@@ -8,9 +9,12 @@ from engine.cluster.dask_executor import DaskExecutor
 
 
 def initialize_client(cluster_config):
-    pilot_compute_description_dask = cluster_config
-    pcs = PilotComputeService()
-    pilot = pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
+    pilot_compute_description = cluster_config
+    execution_engine = ExecutionEngine(cluster_config["type"])
+    working_directory = cluster_config["working_directory"]
+    
+    pcs = PilotComputeService(execution_engine=execution_engine, working_directory=working_directory)
+    pilot = pcs.create_pilot(pilot_compute_description=pilot_compute_description)
     pilot.wait()
     dask_ray_client = pilot.get_client()
     return pilot, dask_ray_client
@@ -25,41 +29,8 @@ class PilotQuantumExecutor(Executor):
         self.pilot, self.client = initialize_client(self.cluster_config["config"])
 
     def close(self):
-        # self.client.close()
         self.pilot.cancel()
         
-
-    def get_client(self):
-        return self.client
-
-    def task(self, func):
-        def wrapper(*args, **kwargs):
-            return self.client.submit(func, *args, **kwargs)
-
-        return wrapper
-
-    def run_sync_task(self, func, *args, **kwargs):
-        print(f"Running qtask with args {args}, kwargs {kwargs}")
-        wrapper_func = self.task(func)
-        return wrapper_func(*args, **kwargs).result()
-
-    @staticmethod
-    def get_command(**kwargs):
-        args_str = " ".join(kwargs['args'])
-        working_directory = kwargs['working_directory']
-        output_file = kwargs['output_file']
-        cmd = f"cd {working_directory} && {kwargs['executable']} {args_str}  > {output_file} 2>&1"
-        return cmd
-
-    def submit_async_process(self, **kwargs):
-        print(f"Running task with cmd {kwargs}")
-        run_func = dask.delayed(os.system)
-        cmd = self.get_command(**kwargs)
-        return self.client.compute(run_func(cmd), resources=kwargs['resources'])
-
-    def submit_tasks(self, input_tasks, compute_func, *args):
-        result_bag = input_tasks.map(lambda x: compute_func(x, *args))
-        return self.client.compute(result_bag)
 
     def submit_tasks(self, compute_func, *args):
         if self.type == "dask":
@@ -72,29 +43,16 @@ class PilotQuantumExecutor(Executor):
         circuits_observables = args[0]
         circuit_bag = db.from_sequence(circuits_observables)
         args = args[1:]
-        result_bag = circuit_bag.map(lambda x: compute_func(x, *args))
-        return self.client.compute(result_bag)
+        return circuit_bag.map(lambda x: self.pilot.submit_task(compute_func, x, *args))
 
 
     def submit_tasks_ray(self, compute_func, *args):
         input_tasks = args[0]  # The first argument is the collection of tasks
         args = args[1:]  # Remove the first argument
-
-        # Define a remote function to compute each task
-        @ray.remote
-        def compute_remote(x, *args):
-            return compute_func(x, *args)
-
-        with self.client as ray_client:
-            # Map the remote function across the input tasks using Ray
-            result_futures = [compute_remote.remote(task, *args) for task in input_tasks]
-
-        return result_futures
+        
+        return [self.pilot.submit_task(compute_func, task, *args) for task in input_tasks]
 
 
     def wait(self, futures):
-        if self.type == "dask":
-            return wait(futures)
-        elif self.type == "ray":
-            with self.client as ray_client:
-                return ray.get(futures)
+        self.pilot.wait_tasks(futures)
+
