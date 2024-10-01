@@ -37,6 +37,9 @@ class PilotQuantumExecutor(Executor):
             return self.submit_tasks_dask(compute_func, *args)
         elif self.type == "ray":
             return self.submit_tasks_ray(compute_func, *args)
+        
+    def submit_task(self, compute_func, *args, **kwargs):
+        self.pilot.submit_task(compute_func, *args, **kwargs)
 
     
     def submit_tasks_dask(self, compute_func, *args):
@@ -55,4 +58,7 @@ class PilotQuantumExecutor(Executor):
 
     def wait(self, futures):
         self.pilot.wait_tasks(futures)
+        
+    def get_results(self, futures):
+        return self.pilot.get_results(futures)
 

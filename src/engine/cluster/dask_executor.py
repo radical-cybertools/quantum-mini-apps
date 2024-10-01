@@ -80,7 +80,10 @@ class DaskExecutor(Executor):
         args = args[1:]
         result_bag = circuit_bag.map(lambda x: compute_func(x, *args))
         return self.client.compute(result_bag)
-
+    
+    def submit_task(self, compute_func, *args, **kwargs):
+        return self.client.submit(compute_func, *args, **kwargs)
+    
     @staticmethod
     def wait(futures):
         wait(futures)
