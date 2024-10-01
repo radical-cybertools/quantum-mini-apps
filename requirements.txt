@@ -3,6 +3,6 @@ dask-cuda
 distributed==2024.1.1
 mpi4py
 pennylane==0.35.1
-qiskit==0.45.0
-qiskit-aer==0.13.2
-qiskit-aer-gpu
+qiskit
+qiskit-aer
+ray[all]~=2.34.0

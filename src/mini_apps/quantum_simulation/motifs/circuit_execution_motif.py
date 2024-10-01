@@ -2,10 +2,12 @@ import os
 import time
 
 
+from qiskit import transpile
 from qiskit_aer.primitives import Estimator as AirEstimator
+from qiskit_ibm_runtime import EstimatorV2
+from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit.quantum_info import Pauli
 from qiskit_ionq import IonQProvider
-from qiskit.primitives import BackendEstimator, BackendSampler
 
 
 
@@ -13,10 +15,33 @@ from engine.metrics.csv_writer import MetricsFileWriter
 from mini_apps.quantum_simulation.motifs.base_motif import Motif
 from mini_apps.quantum_simulation.motifs.qiskit_benchmark import generate_data
 import datetime
+# from qiskit_rigetti import RigettiQCSProvider
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
 
 def run_circuit(circ_obs, qiskit_backend_options):
-    estimator_result = AirEstimator(backend_options=qiskit_backend_options).run(circ_obs[0], Pauli(circ_obs[1])).result()
+    transpiled_circuit = circ_obs[0]
+    observable = circ_obs[1]
+    backend = qiskit_backend_options.get("backend", "aer_simulator")
+    estimator_result = None
+    if backend in ["ionq_simulator", "ionq_qpu"]: 
+        key = qiskit_backend_options.get("api_key", None)
+        if key is not None:
+            key = os.environ["IONQ_API_KEY"]
+        if key is None:
+            ionq_provider = IonQProvider()
+        else:
+            ionq_provider = IonQProvider(token=key)
+        backend = ionq_provider.get_backend(backend)    
+        transpiled_circuit = transpile(circ_obs[0], backend=backend, optimization_level=3)   
+        estimator_result = backend.run(transpiled_circuit).result()        
+    elif backend in ["aer_simulator"]:
+        estimator = AirEstimator(backend_options=qiskit_backend_options)
+        estimator_result = estimator.run(transpiled_circuit, Pauli(observable)).result()   
+    else:
+        service = QiskitRuntimeService()
+        backend = service.backend(qiskit_backend_options.get("backend", "qasm_simulator"))
+        estimator_result = EstimatorV2(mode=backend).run([(transpiled_circuit, observable)]).result()        
     print(estimator_result)
     return estimator_result
 
@@ -35,7 +60,6 @@ class CircuitExecutionBuilder:
         self.file_name = f"ce_result_{self.current_datetime.strftime('%Y-%m-%dT%H:%M:%S')}.csv"
         self.result_file = os.path.join(self.result_dir, self.file_name)
         self.cluster_info = None    
-        # self.result_file=f"{home_dir}/result.csv"
 
     def set_depth_of_recursion(self, depth_of_recursion):
         self.depth_of_recursion = depth_of_recursion
@@ -61,9 +85,8 @@ class CircuitExecutionBuilder:
         self.qiskit_backend_options = qiskit_backend_options
         return self
 
-    def set_result_dir(self, result_dir):
-        self.result_dir = result_dir
-        self.result_file = os.path.join(self.result_dir, self.file_name)
+    def set_result_file(self, result_file):
+        self.result_file = result_file
         return self
 
     def set_cluster_info(self, cluster_info):
