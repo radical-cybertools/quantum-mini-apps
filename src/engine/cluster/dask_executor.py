@@ -1,6 +1,7 @@
 import os
 
 import dask
+import dask.bag as db
 
 try:
     from dask_cuda import LocalCUDACluster
@@ -73,8 +74,11 @@ class DaskExecutor(Executor):
         cmd = self.get_command(**kwargs)
         return self.client.compute(run_func(cmd), resources=kwargs['resources'])
 
-    def submit_tasks(self, input_tasks, compute_func, *args):
-        result_bag = input_tasks.map(lambda x: compute_func(x, *args))
+    def submit_tasks(self, compute_func, *args):
+        circuits_observables = args[0]
+        circuit_bag = db.from_sequence(circuits_observables)
+        args = args[1:]
+        result_bag = circuit_bag.map(lambda x: compute_func(x, *args))
         return self.client.compute(result_bag)
 
     @staticmethod
