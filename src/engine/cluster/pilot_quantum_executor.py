@@ -39,7 +39,7 @@ class PilotQuantumExecutor(Executor):
             return self.submit_tasks_ray(compute_func, *args)
         
     def submit_task(self, compute_func, *args, **kwargs):
-        self.pilot.submit_task(compute_func, *args, **kwargs)
+        return self.pilot.submit_task(compute_func, *args, **kwargs)
 
     
     def submit_tasks_dask(self, compute_func, *args):
