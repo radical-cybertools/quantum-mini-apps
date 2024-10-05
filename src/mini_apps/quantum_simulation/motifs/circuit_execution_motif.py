@@ -18,13 +18,11 @@ import datetime
 # from qiskit_rigetti import RigettiQCSProvider
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
-
-def run_circuit(circ_obs, qiskit_backend_options):
+def run_circuit(circ_obs, qiskit_backend_options, simulator):
     transpiled_circuit = circ_obs[0]
     observable = circ_obs[1]
-    backend = qiskit_backend_options.get("backend", "aer_simulator")
     estimator_result = None
-    if backend in ["ionq_simulator", "ionq_qpu"]: 
+    if simulator in ["ionq_simulator", "ionq_qpu"]: 
         key = qiskit_backend_options.get("api_key", None)
         if key is not None:
             key = os.environ["IONQ_API_KEY"]
@@ -32,15 +30,15 @@ def run_circuit(circ_obs, qiskit_backend_options):
             ionq_provider = IonQProvider()
         else:
             ionq_provider = IonQProvider(token=key)
-        backend = ionq_provider.get_backend(backend)    
+        backend = ionq_provider.get_backend(simulator)
         transpiled_circuit = transpile(circ_obs[0], backend=backend, optimization_level=3)   
         estimator_result = backend.run(transpiled_circuit).result()        
-    elif backend in ["aer_simulator"]:
+    elif simulator in ["aer_simulator"]:
         estimator = AirEstimator(backend_options=qiskit_backend_options)
         estimator_result = estimator.run(transpiled_circuit, Pauli(observable)).result()   
     else:
         service = QiskitRuntimeService()
-        backend = service.backend(qiskit_backend_options.get("backend", "qasm_simulator"))
+        backend = service.backend(simulator)
         estimator_result = EstimatorV2(mode=backend).run([(transpiled_circuit, observable)]).result()        
     print(estimator_result)
     return estimator_result
@@ -59,7 +57,9 @@ class CircuitExecutionBuilder:
         self.current_datetime = datetime.datetime.now()
         self.file_name = f"ce_result_{self.current_datetime.strftime('%Y-%m-%dT%H:%M:%S')}.csv"
         self.result_file = os.path.join(self.result_dir, self.file_name)
-        self.cluster_info = None    
+        self.cluster_info = None  
+        self.pilot = None  
+        self.simulator = "aer_simulator"
 
     def set_depth_of_recursion(self, depth_of_recursion):
         self.depth_of_recursion = depth_of_recursion
@@ -86,21 +86,30 @@ class CircuitExecutionBuilder:
         return self
 
     def set_result_file(self, result_file):
+        os.makedirs(os.path.dirname(result_file), exist_ok=True)
         self.result_file = result_file
         return self
 
     def set_cluster_info(self, cluster_info):
         self.cluster_info = cluster_info
         return self
+    
+    def set_pilot(self, pilot):
+        self.pilot = pilot
+        return self
+
+    def set_simulator(self, simulator):
+        self.simulator = simulator
+        return self    
 
     def build(self, executor):
         return CircuitExecution(executor, self.depth_of_recursion, self.num_qubits, self.n_entries, self.circuit_depth,
-                                self.size_of_observable, self.qiskit_backend_options, self.result_file, self.current_datetime, self.cluster_info)
+                                self.size_of_observable, self.qiskit_backend_options, self.result_file, self.current_datetime, self.cluster_info, self.pilot, self.simulator)
 
 
 class CircuitExecution(Motif):
     def __init__(self, executor, depth_of_recursion, num_qubits, n_entries, circuit_depth, size_of_observable,
-                 qiskit_backend_options, result_file, timestamp, cluster_info):
+                 qiskit_backend_options, result_file, timestamp, cluster_info, pilot, simulator):
         super().__init__(executor, num_qubits)
         self.depth_of_recursion = depth_of_recursion
         self.n_entries = n_entries
@@ -110,12 +119,14 @@ class CircuitExecution(Motif):
         self.result_file = result_file
         self.timestamp = timestamp
         self.cluster_info = cluster_info
+        self.pilot = pilot
+        self.simulator = simulator
         header = ["timestamp", "num_qubits", "n_entries", "circuit_depth", "size_of_observable", "depth_of_recursion",
                   "compute_time_sec", "quantum_options", "cluster_info"]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
 
-
-    def run(self):
+    
+    def submit_tasks(self):
         circuits, observables = generate_data(
             depth_of_recursion=1,
             num_qubits=self.num_qubits,
@@ -127,9 +138,12 @@ class CircuitExecution(Motif):
         circuits_observables = zip(circuits, observables)
         
         # Submit all the tasks
-        futures = self.executor.submit_tasks(run_circuit, circuits_observables, self.qiskit_backend_options)
-
-        # wait for the tasks to complete
+        futures = self.executor.submit_tasks(run_circuit, circuits_observables, self.qiskit_backend_options, self.simulator, pilot=self.pilot)
+        
+        return futures
+    
+    def wait(self, futures):
+        # wait for the tasks to complete        
         start_time = time.time()
         self.executor.wait(futures)
         end_time = time.time()

@@ -167,7 +167,7 @@ class CircuitCutting(Motif):
             print(f"*********************************** len of subexperiments {len(isa_subexperiments)}*************************")
             for label, subsystem_subexpts in isa_subexperiments.items():
                 print(len(subsystem_subexpts))
-                task_future = self.executor.submit_task(execute_sampler, sampler, label, subsystem_subexpts[0], shots=2**12)
+                task_future = self.executor.submit_task(execute_sampler, sampler, label, subsystem_subexpts, shots=2**12)
                 tasks.append(task_future)
                 i=i+1
 

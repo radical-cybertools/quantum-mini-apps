@@ -2,49 +2,63 @@ import os
 
 from engine.manager import MiniAppExecutor
 from mini_apps.quantum_simulation.motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSERVABLE, CIRCUIT_DEPTH, \
-    NUM_ENTRIES, QUBITS
+    NUM_ENTRIES, QUBITS, QISKIT_BACKEND_OPTIONS
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class QuantumSimulation:
-    def __init__(self, cluster_config, parameters=None):
-        self.executor = MiniAppExecutor(cluster_config).get_executor()
-        self.parameters = parameters
+    def __init__(self, cluster_info):
+        self.executor = MiniAppExecutor(cluster_info).get_executor()
+        self.cluster_info = cluster_info        
+        self.ce_builder = CircuitExecutionBuilder()
 
-    def run(self):
-        ce_builder = CircuitExecutionBuilder()
-        ce = ce_builder.set_num_qubits(self.parameters[QUBITS]) \
-            .set_n_entries(self.parameters[NUM_ENTRIES]) \
-            .set_circuit_depth(self.parameters[CIRCUIT_DEPTH]) \
-            .set_size_of_observable(self.parameters[SIZE_OF_OBSERVABLE]) \
-            .set_result_file(os.path.join(SCRIPT_DIR, "result.csv")) \
+    
+    def submit_circuits(self, parameters, pilot=None):
+        self.ce = self.ce_builder.set_num_qubits(parameters[QUBITS]) \
+            .set_n_entries(parameters[NUM_ENTRIES]) \
+            .set_circuit_depth(parameters[CIRCUIT_DEPTH]) \
+            .set_size_of_observable(parameters[SIZE_OF_OBSERVABLE]) \
+            .set_cluster_info(cluster_info) \
+            .set_result_file(os.path.join(SCRIPT_DIR, "results", "results_local_pilot.csv")) \
+            .set_simulator(parameters["SIMULATOR"]) \
             .build(self.executor)
-
-        ce.run()
+        
+        return self.ce.submit_tasks()
+        
+    def wait(self, futures):
+        self.ce.wait(futures)
+    
+    
+    def close(self):
+        self.executor.close()
 
 
 if __name__ == "__main__":
-    cluster_info = {
-        "executor": "dask",
+    RESOURCE_URL_HPC = "ssh://localhost"
+    WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
+        
+    cluster_info = {       
+        "executor": "pilot",        
         "config": {
-            "type": "local",
-            "local": {
-                "n_workers": 4,
-                "threads_per_worker": 2,
-                "memory_limit": "4GB"
-            }
+            "resource": RESOURCE_URL_HPC,
+            "working_directory": WORKING_DIRECTORY,
+            "type": "ray",
+            "number_of_nodes": 1,
+            "cores_per_node": 10
         }
-
     }
 
     ce_parameters = {
         QUBITS: 10,
         NUM_ENTRIES: 10,
         CIRCUIT_DEPTH: 1,
-        SIZE_OF_OBSERVABLE: 1
+        SIZE_OF_OBSERVABLE: 1,
+        "SIMULATOR": "aer_simulator",
+        
     }
 
 
-    qs = QuantumSimulation(cluster_info, ce_parameters)
-    qs.run()
+    qs = QuantumSimulation(cluster_info)
+    futures = qs.submit_circuits(ce_parameters)
+    qs.wait(futures)
