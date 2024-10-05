@@ -58,7 +58,7 @@ class CircuitExecutionBuilder:
         self.file_name = f"ce_result_{self.current_datetime.strftime('%Y-%m-%dT%H:%M:%S')}.csv"
         self.result_file = os.path.join(self.result_dir, self.file_name)
         self.cluster_info = None  
-        self.pilot = None  
+        self.pilot = None 
         self.simulator = "aer_simulator"
 
     def set_depth_of_recursion(self, depth_of_recursion):
@@ -122,7 +122,7 @@ class CircuitExecution(Motif):
         self.pilot = pilot
         self.simulator = simulator
         header = ["timestamp", "num_qubits", "n_entries", "circuit_depth", "size_of_observable", "depth_of_recursion",
-                  "compute_time_sec", "quantum_options", "cluster_info"]
+                  "compute_time_sec"]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
 
     
@@ -150,7 +150,7 @@ class CircuitExecution(Motif):
         compute_time_ms = end_time-start_time
         self.metrics_file_writer.write([self.timestamp, self.num_qubits, self.n_entries, self.circuit_depth,
                                         self.size_of_observable, self.depth_of_recursion,
-                                        compute_time_ms, str(self.qiskit_backend_options), str(self.cluster_info)])
+                                        compute_time_ms)])
 
         self.metrics_file_writer.close()
 
