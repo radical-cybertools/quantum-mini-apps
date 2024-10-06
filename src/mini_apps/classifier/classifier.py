@@ -17,6 +17,10 @@ from time import perf_counter
 import argparse
 
 
+def training():
+    print("okok")
+
+
 parser = argparse.ArgumentParser(description="QML Data Compression Mini App")
 parser.add_argument("--num_nodes", type=int, required=True, help="Number of nodes to use for computation")
 arg = parser.parse_args()
@@ -97,7 +101,7 @@ if __name__ == "__main__":
     }
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    WORKING_DIRECTORY = os.path.join(os.environ["PSCRATCH"], f"work_nodes1_2/{timestamp}")
+    WORKING_DIRECTORY = os.path.join(os.environ["PSCRATCH"], f"work_okt01/{timestamp}")
     RESOURCE_URL_HPC = "slurm://localhost"
 
     os.makedirs(WORKING_DIRECTORY, exist_ok=True)
@@ -115,9 +119,9 @@ if __name__ == "__main__":
             "number_of_nodes": num_nodes,
             "cores_per_node": num_cpus,
             "gpus_per_node": 0,
-            "queue": "premium",
-            # "walltime": 30,
-            "walltime": int(1920 / num_nodes),
+            "queue": "debug",
+            "walltime": 30,
+            # "walltime": int(1920 / num_nodes),
             "type": "ray",
             "project": "m4408",
             "conda_environment": "/pscratch/sd/f/fkiwit/conda/qma/",
