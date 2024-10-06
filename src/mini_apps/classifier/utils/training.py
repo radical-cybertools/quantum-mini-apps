@@ -10,6 +10,10 @@ from tqdm import tqdm
 from time import perf_counter
 import yaml
 
+import os
+from datetime import datetime
+
+
 """
 Experimental design:
  - Benchmark in terms of batch size
@@ -37,20 +41,21 @@ Engineering:
  - [DONE] Limit the number of batches for benchmarking
  - [DONE] Add hparams for experiments (cpu/gpu, vmap, jit, backend)
  - General cleanup (use more function e.g. for data loading)
- - Update environment to enable parallel compilation
- - Use CIFAR 10 dataset
- - Use pilot executor to submit jobs
+ - [WONT DO] Update environment to enable parallel compilation
+ - [DONE] Use CIFAR 10 dataset
+ - [DONE] Use pilot executor to submit jobs
  - Save in the correct directory
 """
 
 def training(config):
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    basepath_results = f"/pscratch/sd/f/fkiwit/work_classifier/j{config['jit']}_v{config['vmap']}_b{config['batch_size']}_{timestamp}"
+    os.makedirs(basepath_results, exist_ok=True)
     # jax.config.update("jax_compilation_cache_dir", "jit_compiled")
     jax.config.update('jax_platform_name', config["device"])
     jax.config.update("jax_enable_x64", True)
     times = {}
-
-    with open(("config.yml"), "w") as filehandler:
-        yaml.dump(config, filehandler)
 
     dev = qml.device("default.qubit")
     @qml.qnode(dev)
@@ -103,7 +108,7 @@ def training(config):
         grad_fn = jit(grad_fn)
 
     # Load data
-    basepath = "/global/homes/f/fkiwit/dev/data_compression/results/frqi_grey_new"
+    basepath = "/global/homes/f/fkiwit/dev/data_compression/results/cifar_new"
     states_train = np.load(f"{basepath}/train_data.npy")
     states_val = np.load(f"{basepath}/test_data.npy")
     targets_train = np.load(f"{basepath}/train_labels.npy")
@@ -189,20 +194,33 @@ def training(config):
 
     times["time_training"] = perf_counter() - start
 
-    # Save results
-    np.save("times_training_loop.npy", np.array(times_training_loop), allow_pickle=True)
-    np.save("weights.npy", weights, allow_pickle=True)
-    np.save("train_losses.npy", np.array(train_losses), allow_pickle=True)
-    np.save("train_accuracies.npy", np.array(train_accuracies), allow_pickle=True)
-    np.save("val_losses.npy", np.array(val_losses), allow_pickle=True)
-    np.save("val_accuracies.npy", np.array(val_accuracies), allow_pickle=True)
-    with open(("times.yml"), "w") as filehandler:
-        yaml.dump(times, filehandler)
+    results_np = {
+        "times_training_loop": np.array(times_training_loop),
+        "weights": weights,
+        "train_losses": np.array(train_losses),
+        "train_accuracies": np.array(train_accuracies),
+        "val_losses": np.array(val_losses),
+        "val_accuracies": np.array(val_accuracies)
+    }
+
+    results_dict = {
+        "config": config,
+        "times": times
+    }
+
+    for key, value in results_np.items():
+        print(f"{key}: {value.shape}")
+        print(basepath_results)
+        np.save(f"{basepath_results}/{key}.npy", value, allow_pickle=True)
+
+    for key, value in results_dict.items():
+        with open((f"{basepath_results}/{key}.yml"), "w") as filehandler:
+            yaml.dump(value, filehandler)
 
 if __name__ == "__main__":
     # Set hyperparameters
     config = {
-        "n_qubits": 11,
+        "n_qubits": 13,
         "depth": 2,
         "batch_size": 80,
         "n_batches": 10,
