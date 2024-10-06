@@ -1,5 +1,4 @@
 import os, dask, ray
-import pennylane as qml
 from pilot.pilot_compute_service import PilotComputeService
 from pilot.pilot_enums_exceptions import ExecutionEngine
 from distributed import Client, wait

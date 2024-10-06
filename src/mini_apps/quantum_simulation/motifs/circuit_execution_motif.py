@@ -54,12 +54,14 @@ class CircuitExecutionBuilder:
         self.qiskit_backend_options = {"method": "statevector"}
         self.result_dir = os.environ['HOME']
         # create a date-time based file name
-        self.current_datetime = datetime.datetime.now()
-        self.file_name = f"ce_result_{self.current_datetime.strftime('%Y-%m-%dT%H:%M:%S')}.csv"
+        self.current_datetime = time.time()
+        curent_datetime = datetime.datetime.now()
+        self.file_name = f"ce_result_{curent_datetime.strftime('%Y-%m-%dT%H:%M:%S')}.csv"
         self.result_file = os.path.join(self.result_dir, self.file_name)
         self.cluster_info = None  
         self.pilot = None 
         self.simulator = "aer_simulator"
+        self.resources_per_task = {}
 
     def set_depth_of_recursion(self, depth_of_recursion):
         self.depth_of_recursion = depth_of_recursion
@@ -101,15 +103,19 @@ class CircuitExecutionBuilder:
     def set_simulator(self, simulator):
         self.simulator = simulator
         return self    
+    
+    def set_resources_per_task(self, resources_per_task):
+        self.resources_per_task = resources_per_task
+        return self
 
     def build(self, executor):
         return CircuitExecution(executor, self.depth_of_recursion, self.num_qubits, self.n_entries, self.circuit_depth,
-                                self.size_of_observable, self.qiskit_backend_options, self.result_file, self.current_datetime, self.cluster_info, self.pilot, self.simulator)
+                                self.size_of_observable, self.qiskit_backend_options, self.result_file, self.current_datetime, self.cluster_info, self.pilot, self.simulator, self.resources_per_task)
 
 
 class CircuitExecution(Motif):
     def __init__(self, executor, depth_of_recursion, num_qubits, n_entries, circuit_depth, size_of_observable,
-                 qiskit_backend_options, result_file, timestamp, cluster_info, pilot, simulator):
+                 qiskit_backend_options, result_file, timestamp, cluster_info, pilot, simulator, resources_per_task):
         super().__init__(executor, num_qubits)
         self.depth_of_recursion = depth_of_recursion
         self.n_entries = n_entries
@@ -121,8 +127,10 @@ class CircuitExecution(Motif):
         self.cluster_info = cluster_info
         self.pilot = pilot
         self.simulator = simulator
+        self.resources_per_task = resources_per_task
+        
         header = ["timestamp", "num_qubits", "n_entries", "circuit_depth", "size_of_observable", "depth_of_recursion",
-                  "compute_time_sec"]
+                  "tasks_wait_time", "total_run_time"]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
 
     
@@ -138,7 +146,7 @@ class CircuitExecution(Motif):
         circuits_observables = zip(circuits, observables)
         
         # Submit all the tasks
-        futures = self.executor.submit_tasks(run_circuit, circuits_observables, self.qiskit_backend_options, self.simulator, pilot=self.pilot)
+        futures = self.executor.submit_tasks(run_circuit, circuits_observables, self.qiskit_backend_options, self.simulator, pilot=self.pilot, resources=self.resources_per_task)
         
         return futures
     
@@ -147,10 +155,11 @@ class CircuitExecution(Motif):
         start_time = time.time()
         self.executor.wait(futures)
         end_time = time.time()
-        compute_time_ms = end_time-start_time
+        tasks_wait_time = end_time-start_time
+        total_run_time = end_time-self.timestamp
         self.metrics_file_writer.write([self.timestamp, self.num_qubits, self.n_entries, self.circuit_depth,
                                         self.size_of_observable, self.depth_of_recursion,
-                                        compute_time_ms)])
+                                        tasks_wait_time, total_run_time])
 
         self.metrics_file_writer.close()
 
