@@ -8,23 +8,28 @@ from mini_apps.quantum_simulation.motifs.circuit_execution_motif import CircuitE
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class QuantumSimulation:
-    def __init__(self, cluster_config, parameters=None):
+    def __init__(self, cluster_config):
         self.executor = MiniAppExecutor(cluster_config).get_executor()
-        self.parameters = parameters
 
-    def run(self):
+    def submit_circuits(self, parameters, pilot=None):
         ce_builder = CircuitExecutionBuilder()
-        ce = ce_builder.set_num_qubits(self.parameters[QUBITS]) \
-            .set_n_entries(self.parameters[NUM_ENTRIES]) \
-            .set_circuit_depth(self.parameters[CIRCUIT_DEPTH]) \
-            .set_size_of_observable(self.parameters[SIZE_OF_OBSERVABLE]) \
-            .set_qiskit_backend_options(self.parameters[QISKIT_BACKEND_OPTIONS]) \
+        ce = ce_builder.set_num_qubits(parameters[QUBITS]) \
+            .set_n_entries(parameters[NUM_ENTRIES]) \
+            .set_circuit_depth(parameters[CIRCUIT_DEPTH]) \
+            .set_size_of_observable(parameters[SIZE_OF_OBSERVABLE]) \
+            .set_qiskit_backend_options(parameters[QISKIT_BACKEND_OPTIONS]) \
             .set_result_file(os.path.join(SCRIPT_DIR, "result.csv")) \
             .build(self.executor)
-
-        ce.run()
-
-
+                    
+        return self.ce.submit_tasks()
+        
+    def wait(self, futures):
+        self.ce.wait(futures)
+    
+    
+    def close(self):
+        self.executor.close()  
+        
 if __name__ == "__main__":
     scheduler_file = os.path.join(os.environ["SCRATCH"], "scheduler_file.json")
     cluster_info = {
@@ -43,4 +48,5 @@ if __name__ == "__main__":
     }
 
     qs = QuantumSimulation(cluster_info, ce_parameters)
-    qs.run()
+    futures = qs.submit_circuits(ce_parameters)
+    qs.wait(futures)
