@@ -6,3 +6,4 @@ pennylane==0.35.1
 qiskit
 qiskit-aer
 ray[all]~=2.34.0
+qiskit-addon-cutting

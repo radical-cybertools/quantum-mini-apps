@@ -11,19 +11,10 @@ class QuantumSimulation:
     def __init__(self, cluster_info, parameters=None):
         self.executor = MiniAppExecutor(cluster_info).get_executor()
         self.ce_builder = CircuitExecutionBuilder()
-        self.parameters = parameters
         self.cluster_info = cluster_info
 
-    
-    def update_parameters(self, parameters):
-        self.parameters = parameters
 
-    
-    def update_cluster_info(self, cluster_info):
-        self.cluster_info = cluster_info
-    
-
-    def run(self):        
+    def submit_circuits(self, parameters, pilot=None):      
         self.ce = self.ce_builder.set_num_qubits(self.parameters[QUBITS]) \
             .set_n_entries(self.parameters[NUM_ENTRIES]) \
             .set_circuit_depth(self.parameters[CIRCUIT_DEPTH]) \
@@ -32,10 +23,12 @@ class QuantumSimulation:
             .set_cluster_info(self.cluster_info) \
             .set_result_dir(os.path.join(SCRIPT_DIR, "results")) \
             .build(self.executor)
-        
-        self.ce.run()
+            
+        return self.ce.submit_tasks()
     
-    
+    def wait(self, futures):
+        self.ce.wait(futures)
+
     def close(self):
         self.executor.close()
 
@@ -87,9 +80,8 @@ if __name__ == "__main__":
                             # "statevector_parallel_threshold": qubits-1
                         }
                     }
-                    qs.update_parameters(ce_parameters)
-                    qs.run()
-
+                    futures = qs.submit_circuits(ce_parameters)
+                    qs.wait(futures)
                 qs.close()
             except Exception as e:
                 print(e)
