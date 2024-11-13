@@ -29,6 +29,9 @@ class QuantumSimulation:
     def wait(self, futures):
         self.ce.wait(futures)
     
+    def run(ce_parameters):
+        futures = qs.submit_circuits(ce_parameters)
+        qs.wait(futures)
     
     def close(self):
         self.executor.close()
@@ -60,5 +63,4 @@ if __name__ == "__main__":
 
 
     qs = QuantumSimulation(cluster_info)
-    futures = qs.submit_circuits(ce_parameters)
-    qs.wait(futures)
+    qs.run(ce_parameters)
