@@ -30,7 +30,7 @@ class QuantumSimulation:
 if __name__ == "__main__":
     RESOURCE_URL_HPC = "slurm://localhost"
     WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
-    nodes = [1, 2]    
+    nodes = [1]    
     for node in nodes:
         try:
             cluster_info = {       
@@ -45,7 +45,10 @@ if __name__ == "__main__":
                     "queue": "debug",
                     "walltime": 30,            
                     "project": "m4408",
-                    "scheduler_script_commands": ["#SBATCH --constraint=gpu"]
+                    "scheduler_script_commands": ["#SBATCH --constraint=gpu",
+                                                  "#SBATCH --gpus-per-task=1",
+                                                  "#SBATCH --ntasks-per-node=4",
+                                                  "#SBATCH --gpu-bind=none"],
                 }
             }
 
