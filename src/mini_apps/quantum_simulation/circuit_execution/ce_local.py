@@ -31,7 +31,8 @@ class QuantumSimulation:
     
     def run(self, ce_parameters):
         futures = qs.submit_circuits(ce_parameters)
-        qs.wait(futures)
+        return self.executor.get_results(futures)
+             
     
     def close(self):
         self.executor.close()
@@ -57,10 +58,10 @@ if __name__ == "__main__":
         NUM_ENTRIES: 10,
         CIRCUIT_DEPTH: 1,
         SIZE_OF_OBSERVABLE: 1,
-        "SIMULATOR": "aer_simulator",
-        
+        "SIMULATOR": "aer_simulator",   
     }
 
 
     qs = QuantumSimulation(cluster_info)
     qs.run(ce_parameters)
+    qs.close()
