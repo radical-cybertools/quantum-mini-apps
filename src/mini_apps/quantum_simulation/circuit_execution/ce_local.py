@@ -29,7 +29,7 @@ class QuantumSimulation:
     def wait(self, futures):
         self.ce.wait(futures)
     
-    def run(ce_parameters):
+    def run(self, ce_parameters):
         futures = qs.submit_circuits(ce_parameters)
         qs.wait(futures)
     

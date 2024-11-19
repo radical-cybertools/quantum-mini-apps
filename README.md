@@ -31,7 +31,9 @@ git clone https://github.com/radical-cybertools/quantum-mini-apps.git
 
 2. Install the required dependencies:
 ```
+cd quantum-mini-apps
 pip install -r requirements.txt
+export PYTHONPATH=$PWD/src:$PYTHONPATH
 ```
 
 3. Run the provided example Mini-App:

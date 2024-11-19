@@ -15,7 +15,7 @@ class QuantumSimulation:
 
     def run(self):
         cc_builder = CircuitCuttingBuilder()
-        ce = cc_builder.set_subcircuit_size(self.parameters[SUBCIRCUIT_SIZE]) \
+        cc = cc_builder.set_subcircuit_size(self.parameters[SUBCIRCUIT_SIZE]) \
             .set_base_qubits(self.parameters[BASE_QUBITS]) \
             .set_observables(self.parameters[OBSERVABLES]) \
             .set_scale_factor(self.parameters[SCALE_FACTOR]) \
@@ -24,7 +24,7 @@ class QuantumSimulation:
             .set_full_circuit_task_resources(self.parameters[FULL_CIRCUIT_TASK_RESOURCES]) \
             .build(self.executor)
 
-        ce.run()
+        cc.run()
 
 
 if __name__ == "__main__":
