@@ -33,7 +33,7 @@ git clone https://github.com/radical-cybertools/quantum-mini-apps.git
 ```
 cd quantum-mini-apps
 pip install -r requirements.txt
-export PYTHONPATH=$PWD/src:$PYTHONPATH
+export PYTHONPATH=$PWD/src:$PYTHONPATH ### Add this statement to shell startup script (like .bashrc)
 ```
 
 3. Run the provided example Mini-App:
