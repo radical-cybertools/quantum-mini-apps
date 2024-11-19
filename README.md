@@ -39,7 +39,7 @@ export PYTHONPATH=$PWD/src:$PYTHONPATH
 3. Run the provided example Mini-App:
 
 ```commandline
-python mini-apps/quantum-simulation/ce_local.py
+python src/mini_apps/quantum_simulation/circuit_execution/ce_local.py
 ```
 
 This will execute the `QuantumSimulation` Mini-App with the default configuration, which runs a circuit execution motif on a local Dask cluster.
