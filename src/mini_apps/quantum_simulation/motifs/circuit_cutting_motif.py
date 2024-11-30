@@ -178,7 +178,9 @@ class CircuitCutting(Motif):
     def run(self):
         subexperiments, coefficients, subobservables, observable, circuit = self.pre_processing()
         
-        backend_options = self.qiskit_backend_options.get("backend_options", DEFAULT_SIMULATOR_BACKEND_OPTIONS)
+        backend_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
+        if self.qiskit_backend_options:
+            backend_options = self.qiskit_backend_options
         backend = AerSimulator(**backend_options["backend_options"])
         
         traspile_start_time = time.time()
@@ -270,3 +272,4 @@ OBSERVABLES= "observables"
 SCALE_FACTOR= "scale_factor"
 SUB_CIRCUIT_TASK_RESOURCES = "sub_circuit_task_resources"
 FULL_CIRCUIT_TASK_RESOURCES = "full_circuit_task_resources"
+SIMULATOR_BACKEND_OPTIONS = "simulator_backend_options"
