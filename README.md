@@ -68,8 +68,10 @@ The following Mini-Apps are currently implemented
 The Quantum Simulation mini-app implements following motifs
 
 [**Circuit Execution**](CircuitExecution.md) 
+
 [**Circuit Cutting**](CircuitCutting.md)
-[**State Vector Mini-Apps**](StateVector.md)
+
+[**State Vector**](StateVector.md)
 
 ### QML Data Compression & Training
 
@@ -89,6 +91,9 @@ How do i resolve this error when i use Pilot-Quantum Ray executor while running 
 
 Ray deserializes results before returning the objects to the client, The qiskit object somehow has difficulty in deserializing, one hack is to comment out the line causing the problem in data_bin.py class.   This should unblock the development effort.
 
-```File "/pscratch/sd/l/luckow/conda/quantum-mini-apps2/lib/python3.11/site-packages/qiskit/primitives/containers/data_bin.py", line 97, in __setattr__
-    raise NotImplementedError```
+```
+File "/pscratch/sd/l/luckow/conda/quantum-mini-apps2/lib/python3.11/site-packages/qiskit/primitives/containers/data_bin.py", line 97, in __setattr__
+    raise NotImplementedError
+
+```
 
