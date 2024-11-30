@@ -31,36 +31,48 @@ git clone https://github.com/radical-cybertools/quantum-mini-apps.git
 
 2. Install the required dependencies:
 ```
+cd quantum-mini-apps
 pip install -r requirements.txt
+export PYTHONPATH=$PWD/src:$PYTHONPATH ### Add this statement to shell startup script (like .bashrc)
 ```
 
 3. Run the provided example Mini-App:
 
 ```commandline
-python mini-apps/quantum-simulation/ce_local.py
+python src/mini_apps/quantum_simulation/circuit_execution/ce_local.py
 ```
 
 This will execute the `QuantumSimulation` Mini-App with the default configuration, which runs a circuit execution motif on a local Dask cluster.
 
 To run on Perlmutter, follow [Using Dask on Perlmutter](https://gitlab.com/NERSC/nersc-notebooks/-/tree/main/perlmutter/dask#using-dask-on-perlmutter) to provision dask cluster, and run ```python mini-apps/quantum-simulation/ce_perlmutter.py``` against the running Perlmutter dask cluster.
 
-## Customization
 
-To customize the framework or develop your own Mini-Apps, you can follow these sample steps:
+## Motifs
 
-1. **Implement a new Mini-App**: Create a new class that inherits from the `Motif` base class and implement the `run` method to define the quantum computing task or algorithm.
+Currently the following Motifs were implemented
 
-2. **Configure the Motif**: Use the provided builder classes (e.g., `CircuitExecutionBuilder`) to configure the motif with the desired parameters.
+[**Circuit Execution**](CircuitExecution.md)
+[**Circuit Cutting**](CircuitCutting.md)
+[**State Vector Mini-Apps**](StateVector.md)
 
-3. **Create a new Mini-App**: Define a new class that inherits from the `MiniApp` base class and implement the `run` method to combine and execute the desired motifs.
-
-4. **Configure the Execution Environment**: Modify the `cluster_info` dictionary in the `main.py` file to specify the desired execution environment (e.g., local, cluster, or cloud) and its configuration.
-
-5. **Run the Mini-App**: Execute the created mini-app script file with the appropriate configuration to run the Mini-App and benchmark the performance of the quantum computing system.
-
-## Contributing
-
+## Extending the Mini-App framework
 Contributions to the Quantum Mini-Apps framework are welcome! If you encounter any issues or have suggestions for improvements, please open an issue or submit a pull request.
+
+To customize the framework or develop your own Mini-Apps/Motifs, you can extend the base Motif class which provides executor as an abstraction for executing the mini-apps. 
+
+
+## Mini Apps
+The following Mini-Apps are currently implemented
+
+### Quantum Simulation
+The Quantum Simulation mini-app implements following motifs
+
+[**Circuit Execution**](CircuitExecution.md) 
+[**Circuit Cutting**](CircuitCutting.md)
+[**State Vector Mini-Apps**](StateVector.md)
+
+### QML Data Compression & Training
+
 
 ## License
 
@@ -70,3 +82,13 @@ This project is licensed under the [MIT License](LICENSE).
 ## Resources
 
 [Using Dask on Perlmutter](https://gitlab.com/NERSC/nersc-notebooks/-/tree/main/perlmutter/dask#using-dask-on-perlmutter)
+
+### FAQ
+
+How do i resolve this error when i use Pilot-Quantum Ray executor while running Circuit cutting motif? 
+
+Ray deserializes results before returning the objects to the client, The qiskit object somehow has difficulty in deserializing, one hack is to comment out the line causing the problem in data_bin.py class.   This should unblock the development effort.
+
+```File "/pscratch/sd/l/luckow/conda/quantum-mini-apps2/lib/python3.11/site-packages/qiskit/primitives/containers/data_bin.py", line 97, in __setattr__
+    raise NotImplementedError```
+
