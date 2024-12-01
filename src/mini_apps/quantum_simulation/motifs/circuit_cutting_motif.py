@@ -33,7 +33,7 @@ from qiskit_aer.primitives import EstimatorV2
 import logging
 
 
-DEFAULT_SIMULATOR_BACKEND_OPTIONS = {"backend_options": {"device":"CPU"}}
+DEFAULT_SIMULATOR_BACKEND_OPTIONS = {"backend_options": {"device":"CPU", "method": "statevector"}}
 
 
 def execute_sampler(sampler, label, subsystem_subexpts, shots):
@@ -58,7 +58,7 @@ class CircuitCuttingBuilder:
         self.base_qubits = None
         self.observables = None
         self.scale_factor = None
-        self.qiskit_backend_options = {"method": "statevector"}
+        self.qiskit_backend_options = None
         self.sub_circuit_task_resources = {'num_cpus': 1, 'num_gpus': 0, 'memory': None}
 
     def set_subcircuit_size(self, subcircuit_size):
@@ -181,6 +181,7 @@ class CircuitCutting(Motif):
         backend_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
         if self.qiskit_backend_options:
             backend_options = self.qiskit_backend_options
+        self.logger.info(f"Backend options: {backend_options}")
         backend = AerSimulator(**backend_options["backend_options"])
         
         traspile_start_time = time.time()
@@ -193,7 +194,7 @@ class CircuitCutting(Motif):
         self.logger.info("*********************************** transpiling done ***********************************")
         traspile_end_time = time.time()
         transpile_time_secs = traspile_end_time - traspile_start_time
-        self.logger.info("Transpile time: ", transpile_time_secs)
+        self.logger.info(f"Transpile time: {transpile_time_secs}")
         
     
         tasks=[]
@@ -218,6 +219,8 @@ class CircuitCutting(Motif):
         # Get all samplePubResults            
         samplePubResults = collections.defaultdict(list)
         for result in results_tuple:
+            print(result)
+            self.logger.info(f"Result: {result[0], result[1]}")
             samplePubResults[result[0]].extend(result[1]._pub_results)        
         
         results = {}
