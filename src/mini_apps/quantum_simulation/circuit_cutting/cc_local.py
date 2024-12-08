@@ -1,4 +1,7 @@
 import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 from engine.manager import MiniAppExecutor
 from mini_apps.quantum_simulation.motifs.circuit_cutting_motif import (
@@ -31,25 +34,32 @@ if __name__ == "__main__":
     RESOURCE_URL_HPC = "ssh://localhost"
     WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
         
-    cluster_info = {       
-        "executor": "pilot",
-        "config": {
-            "resource": RESOURCE_URL_HPC,
-            "working_directory": WORKING_DIRECTORY,
-            "type": "ray",
-            "number_of_nodes": 1,
-            "cores_per_node": 10
-        }
-    }
+    circuit_sizes = [8]    
+    for circuit_size in circuit_sizes:
+        try:
+            cluster_info = {       
+                "executor": "pilot",
+                "config": {
+                    "resource": RESOURCE_URL_HPC,
+                    "working_directory": WORKING_DIRECTORY,
+                    "type": "ray",
+                    "number_of_nodes": 1,
+                    "cores_per_node": 10
+                }
+            }
 
-    cc_parameters = {
-        SUBCIRCUIT_SIZE : 2,
-        BASE_QUBITS: 7,
-        SCALE_FACTOR : 1,
-        OBSERVABLES: ["ZIIIIII", "IIIZIII", "IIIIIII"], 
-        SUB_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None},
-        FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None}
-    }
+            cc_parameters = {
+                SUBCIRCUIT_SIZE : 4,
+                BASE_QUBITS: 8,
+                SCALE_FACTOR : 1,
+                OBSERVABLES: ["ZIIIIIIZ", "IIIZIIIX", "IIIIIIII"], 
+                SUB_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None},
+                FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None}
+            }
 
-    qs = QuantumSimulation(cluster_info, cc_parameters)
-    qs.run()
+            qs = QuantumSimulation(cluster_info, cc_parameters)
+            qs.run()
+        
+        except Exception as e:
+            print(f"Error: {e}")
+            raise e
