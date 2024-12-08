@@ -96,4 +96,5 @@ File "/pscratch/sd/l/xxx/conda/quantum-mini-apps2/lib/python3.11/site-packages/q
     raise NotImplementedError
 
 ```
+see: <https://github.com/Qiskit/qiskit/issues/12787>
 
