@@ -37,6 +37,7 @@ DEFAULT_SIMULATOR_BACKEND_OPTIONS = {"backend_options": {"device":"CPU", "method
 
 
 def execute_sampler(sampler, label, subsystem_subexpts, shots):
+    print(sampler, label, subsystem_subexpts, shots)
     submit_start = time.time()
     job = sampler.run(subsystem_subexpts, shots=shots)
     submit_end = time.time()
@@ -59,6 +60,7 @@ class CircuitCuttingBuilder:
         self.observables = None
         self.scale_factor = None
         self.qiskit_backend_options = None
+        self.num_samples = 10
         self.sub_circuit_task_resources = {'num_cpus': 1, 'num_gpus': 0, 'memory': None}
 
     def set_subcircuit_size(self, subcircuit_size):
@@ -85,6 +87,10 @@ class CircuitCuttingBuilder:
         self.qiskit_backend_options = qiskit_backend_options
         return self
     
+    def set_num_samples(self, num_samples):
+        self.num_samples = num_samples
+        return self
+    
     def set_sub_circuit_task_resources(self, sub_circuit_task_resources):
         self.sub_circuit_task_resources = sub_circuit_task_resources
         return self
@@ -94,13 +100,13 @@ class CircuitCuttingBuilder:
         return self    
     
     def build(self, executor):
-        return CircuitCutting(executor, self.subcircuit_size, self.base_qubits, self.observables, self.scale_factor, self.qiskit_backend_options, self.sub_circuit_task_resources, self.full_circuit_task_resources, self.result_file)
+        return CircuitCutting(executor, self.subcircuit_size, self.base_qubits, self.observables, self.scale_factor, self.qiskit_backend_options, self.sub_circuit_task_resources, self.full_circuit_task_resources, self.result_file, self.num_samples)
 
 
 
 
 class CircuitCutting(Motif):
-    def __init__(self, executor, subcircuit_size, base_qubits, observables, scale_factor, qiskit_backend_options, sub_circuit_task_resources ,full_circuit_task_resources, result_file):
+    def __init__(self, executor, subcircuit_size, base_qubits, observables, scale_factor, qiskit_backend_options, sub_circuit_task_resources ,full_circuit_task_resources, result_file, num_samples):
         super().__init__(executor, base_qubits)
         self.subcircuit_size = subcircuit_size
         self.observables = observables
@@ -109,6 +115,7 @@ class CircuitCutting(Motif):
         self.qiskit_backend_options = qiskit_backend_options
         self.base_qubits = base_qubits
         self.experiment_start_time = datetime.datetime.now()
+        self.num_samples = num_samples
         self.sub_circuit_task_resources = sub_circuit_task_resources
         self.full_circuit_task_resources = full_circuit_task_resources
         header = ["experiment_start_time", "subcircuit_size", "base_qubits", "observables", "scale_factor", 
@@ -131,13 +138,12 @@ class CircuitCutting(Motif):
         
         self.logger = logger
 
-    def pre_processing(self):    
+    def pre_processing(self, num_samples=10):    
         circuit = EfficientSU2(self.base_qubits * self.scale_factor, entanglement="linear", reps=2).decompose()
-        circuit.assign_parameters([0.4] * len(circuit.parameters), inplace=True)
-        
+        circuit.assign_parameters([0.4] * len(circuit.parameters), inplace=True)        
         observable = SparsePauliOp([o * self.scale_factor for o in self.observables])
-
-
+        self.logger.info(f"Number of qubits in the circuit: {circuit.num_qubits}")
+        
         # Specify settings for the cut-finding optimizer
         optimization_settings = OptimizationParameters(seed=111)
 
@@ -167,7 +173,7 @@ class CircuitCutting(Motif):
         )
 
         subexperiments, coefficients = generate_cutting_experiments(
-            circuits=subcircuits, observables=subobservables, num_samples=1_000
+            circuits=subcircuits, observables=subobservables, num_samples=num_samples
         )
         self.logger.info(
             f"{len(subexperiments[0]) + len(subexperiments[1])} total subexperiments to run on backend."
@@ -176,7 +182,7 @@ class CircuitCutting(Motif):
 
             
     def run(self):
-        subexperiments, coefficients, subobservables, observable, circuit = self.pre_processing()
+        subexperiments, coefficients, subobservables, observable, circuit = self.pre_processing(self.num_samples)
         
         backend_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
         if self.qiskit_backend_options:
@@ -188,9 +194,15 @@ class CircuitCutting(Motif):
         self.logger.info("*********************************** transpiling circuits ***********************************")
         # Transpile the subexperiments to ISA circuits
         pass_manager = generate_preset_pass_manager(optimization_level=1, backend=backend)
-        isa_subexperiments = {}
-        for label, partition_subexpts in subexperiments.items():
-            isa_subexperiments[label] = pass_manager.run(partition_subexpts)
+        # isa_subexperiments = {}
+        
+        isa_subexperiments = {
+                label: pass_manager.run(partition_subexpts)
+                for label, partition_subexpts in subexperiments.items()
+        }          
+        
+        # for label, partition_subexpts in subexperiments.items():
+        #     isa_subexperiments[label] = pass_manager.run(partition_subexpts)
         self.logger.info("*********************************** transpiling done ***********************************")
         traspile_end_time = time.time()
         transpile_time_secs = traspile_end_time - traspile_start_time
@@ -205,17 +217,17 @@ class CircuitCutting(Motif):
             sampler = SamplerV2(mode=batch)
             self.logger.info(f"*********************************** len of subexperiments {len(isa_subexperiments)}*************************")
             for label, subsystem_subexpts in isa_subexperiments.items():
-                self.logger.info(len(subsystem_subexpts))
-                task_future = self.executor.submit_task(execute_sampler, sampler, label, subsystem_subexpts, resources=resources, shots=2**12)
-                tasks.append(task_future)
-                i=i+1
+                self.logger.info(f"*********************************** len of subsystem_subexpts {len(subsystem_subexpts)}*************************")
+                for ss in subsystem_subexpts:                                        
+                    task_future = self.executor.submit_task(execute_sampler, sampler, label, [ss], shots=2**12, resources=resources)                    
+                    tasks.append(task_future)
+                    i=i+1
 
         results_tuple=self.executor.get_results(tasks)
         sub_circuit_execution_end_time = time.time()
         subcircuit_exec_time_secs = sub_circuit_execution_end_time - sub_circuit_execution_time
         self.logger.info(f"Execution time for subcircuits: {subcircuit_exec_time_secs}")
-        
-        
+                
         # Get all samplePubResults            
         samplePubResults = collections.defaultdict(list)
         for result in results_tuple:
@@ -276,3 +288,4 @@ SCALE_FACTOR= "scale_factor"
 SUB_CIRCUIT_TASK_RESOURCES = "sub_circuit_task_resources"
 FULL_CIRCUIT_TASK_RESOURCES = "full_circuit_task_resources"
 SIMULATOR_BACKEND_OPTIONS = "simulator_backend_options"
+NUM_SAMPLES = "num_samples"

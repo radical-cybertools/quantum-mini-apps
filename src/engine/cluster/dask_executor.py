@@ -6,7 +6,8 @@ import dask.bag as db
 try:
     from dask_cuda import LocalCUDACluster
 except:
-    print("Failed to import dask cuda..")
+    # print("Failed to import dask cuda..")
+    pass
 
 from distributed import LocalCluster, Client, wait
 

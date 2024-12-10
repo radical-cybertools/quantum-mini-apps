@@ -31,7 +31,7 @@ class QuantumSimulation:
 if __name__ == "__main__":
     RESOURCE_URL_HPC = "slurm://localhost"
     WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
-    nodes = [1,2,4,8,16]    
+    nodes = [1]    
     for node in nodes:
         try:
             cluster_info = {       
@@ -59,7 +59,7 @@ if __name__ == "__main__":
                 SCALE_FACTOR : 1,
                 OBSERVABLES: ["ZIIIIII", "IIIZIII", "IIIIIII"], 
                 SUB_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 1, 'memory': None},
-                FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 64, 'num_gpus': 4 * node, 'memory': None},
+                FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 64, 'num_gpus': 1, 'memory': None},
                 SIMULATOR_BACKEND_OPTIONS: {"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}}
             }
 

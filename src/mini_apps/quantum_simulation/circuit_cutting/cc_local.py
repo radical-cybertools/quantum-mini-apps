@@ -2,10 +2,11 @@ import os
 
 from engine.manager import MiniAppExecutor
 from mini_apps.quantum_simulation.motifs.circuit_cutting_motif import (
-    BASE_QUBITS, OBSERVABLES, SCALE_FACTOR, SUB_CIRCUIT_TASK_RESOURCES, SUBCIRCUIT_SIZE, FULL_CIRCUIT_TASK_RESOURCES,
+    BASE_QUBITS, NUM_SAMPLES, OBSERVABLES, SCALE_FACTOR, SIMULATOR_BACKEND_OPTIONS, SUB_CIRCUIT_TASK_RESOURCES, SUBCIRCUIT_SIZE, FULL_CIRCUIT_TASK_RESOURCES,
     CircuitCuttingBuilder)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# import pdb
 
 
 class QuantumSimulation:
@@ -22,8 +23,10 @@ class QuantumSimulation:
             .set_result_file(os.path.join(SCRIPT_DIR, "result.csv")) \
             .set_sub_circuit_task_resources(self.parameters[SUB_CIRCUIT_TASK_RESOURCES]) \
             .set_full_circuit_task_resources(self.parameters[FULL_CIRCUIT_TASK_RESOURCES]) \
+            .set_num_samples(self.parameters[NUM_SAMPLES]) \
             .build(self.executor)
 
+        # pdb.set_trace()
         cc.run()
 
 
@@ -38,7 +41,8 @@ if __name__ == "__main__":
             "working_directory": WORKING_DIRECTORY,
             "type": "ray",
             "number_of_nodes": 1,
-            "cores_per_node": 10
+            "cores_per_node": 10,
+            "gpus_per_node": 4,
         }
     }
 
@@ -47,8 +51,10 @@ if __name__ == "__main__":
         BASE_QUBITS: 7,
         SCALE_FACTOR : 1,
         OBSERVABLES: ["ZIIIIII", "IIIZIII", "IIIIIII"], 
+        NUM_SAMPLES: 10,
         SUB_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None},
-        FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None}
+        FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None},
+        # SIMULATOR_BACKEND_OPTIONS: {"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}}
     }
 
     qs = QuantumSimulation(cluster_info, cc_parameters)
