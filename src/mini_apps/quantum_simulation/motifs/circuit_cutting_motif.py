@@ -39,77 +39,77 @@ DEFAULT_SIMULATOR_BACKEND_OPTIONS = {"backend_options": {"device":"CPU", "method
 
 def execute_sampler(backend_options, label, subsystem_subexpts, shots):
     submit_start = time.time()
-    #backend = AerSimulator(backend_options)
     backend = AerSimulator(**backend_options["backend_options"])
-    # with Batch(backend=backend) as batch:
-    sampler = SamplerV2(backend=backend)
-    job = sampler.run(subsystem_subexpts, shots=shots)
-    submit_end = time.time()
-    result_start = time.time()
-    result = job.result()    
-    result_end = time.time()
-
-    # debug
-    for pub_result in result:
-        # Debugging statements to inspect pub_result
-        print("Attributes of pub_result:", dir(pub_result))
-        print("pub_result:", pub_result)
-        # Break after first iteration for debugging
-        break
-
-    # Reconstruct the PrimitiveResult object to fix serialization issues with current Qiskit versions (at the time 1.3)
-    # see https://github.com/Qiskit/qiskit/issues/12787
-    from qiskit.primitives.containers import PrimitiveResult, SamplerPubResult, DataBin, BitArray
     
-    # Override DataBin class to fix serialization issues
-    class CustomDataBin(DataBin):
-        def __setattr__(self, name, value):
-            super().__init__()
-            self.__dict__[name] = value
-                
-    # Reconstruct the PrimitiveResult object to fix serialization issues
-    new_results = []
-    for pub_result in result:
-        # Deep copy the metadata
-        new_metadata = copy.deepcopy(pub_result.metadata)
+    with Batch(backend=backend) as batch:
+        sampler = SamplerV2(mode=batch)
+        job = sampler.run(subsystem_subexpts, shots=shots)
+        submit_end = time.time()
+        result_start = time.time()
+        result = job.result()    
+        result_end = time.time()
 
-        # Access the DataBin object
-        data_bin = pub_result.data
+        # debug
+        for pub_result in result:
+            # Debugging statements to inspect pub_result
+            print("Attributes of pub_result:", dir(pub_result))
+            print("pub_result:", pub_result)
+            # Break after first iteration for debugging
+            break
 
-        # Reconstruct DataBin
-        new_data_bin_dict = {}
+        # Reconstruct the PrimitiveResult object to fix serialization issues with current Qiskit versions (at the time 1.3)
+        # see https://github.com/Qiskit/qiskit/issues/12787
+        from qiskit.primitives.containers import PrimitiveResult, SamplerPubResult, DataBin, BitArray
+        
+        # Override DataBin class to fix serialization issues
+        class CustomDataBin(DataBin):
+            def __setattr__(self, name, value):
+                super().__init__()
+                self.__dict__[name] = value
+                    
+        # Reconstruct the PrimitiveResult object to fix serialization issues
+        new_results = []
+        for pub_result in result:
+            # Deep copy the metadata
+            new_metadata = copy.deepcopy(pub_result.metadata)
 
-        # Explicitly copy 'observable_measurements'
-        if hasattr(data_bin, 'observable_measurements'):
-            observable_measurements = data_bin.observable_measurements
-            new_observable_array = np.copy(observable_measurements.array)
-            new_observable_bitarray = BitArray(new_observable_array, observable_measurements.num_bits)
-            new_data_bin_dict['observable_measurements'] = new_observable_bitarray
+            # Access the DataBin object
+            data_bin = pub_result.data
 
-        # Explicitly copy 'qpd_measurements'
-        if hasattr(data_bin, 'qpd_measurements'):
-            qpd_measurements = data_bin.qpd_measurements
-            new_qpd_array = np.copy(qpd_measurements.array)
-            new_qpd_bitarray = BitArray(new_qpd_array, qpd_measurements.num_bits)
-            new_data_bin_dict['qpd_measurements'] = new_qpd_bitarray
+            # Reconstruct DataBin
+            new_data_bin_dict = {}
 
-        # Copy other attributes of DataBin (e.g., 'shape')
-        if hasattr(data_bin, 'shape'):
-            new_data_bin_dict['shape'] = copy.deepcopy(data_bin.shape)
+            # Explicitly copy 'observable_measurements'
+            if hasattr(data_bin, 'observable_measurements'):
+                observable_measurements = data_bin.observable_measurements
+                new_observable_array = np.copy(observable_measurements.array)
+                new_observable_bitarray = BitArray(new_observable_array, observable_measurements.num_bits)
+                new_data_bin_dict['observable_measurements'] = new_observable_bitarray
 
-        # Create a new DataBin instance
-        new_data_bin = CustomDataBin(**new_data_bin_dict)
-        #new_data_bin.__setattr__ = custom_setattr
+            # Explicitly copy 'qpd_measurements'
+            if hasattr(data_bin, 'qpd_measurements'):
+                qpd_measurements = data_bin.qpd_measurements
+                new_qpd_array = np.copy(qpd_measurements.array)
+                new_qpd_bitarray = BitArray(new_qpd_array, qpd_measurements.num_bits)
+                new_data_bin_dict['qpd_measurements'] = new_qpd_bitarray
 
-        # Create a new SamplerPubResult
-        new_pub_result = SamplerPubResult(data=new_data_bin, metadata=new_metadata)
-        new_results.append(new_pub_result)
+            # Copy other attributes of DataBin (e.g., 'shape')
+            if hasattr(data_bin, 'shape'):
+                new_data_bin_dict['shape'] = copy.deepcopy(data_bin.shape)
 
-    # Create a new PrimitiveResult
-    new_result = PrimitiveResult(new_results, metadata=copy.deepcopy(result.metadata))
+            # Create a new DataBin instance
+            new_data_bin = CustomDataBin(**new_data_bin_dict)
+            #new_data_bin.__setattr__ = custom_setattr
 
-    print(f"Job {label} completed with job id {job.job_id()}, submit_time: {submit_end-submit_start} and execution_time: {result_end - result_start}, type: {type(new_result)}")
-    return (label, new_result)
+            # Create a new SamplerPubResult
+            new_pub_result = SamplerPubResult(data=new_data_bin, metadata=new_metadata)
+            new_results.append(new_pub_result)
+
+        # Create a new PrimitiveResult
+        new_result = PrimitiveResult(new_results, metadata=copy.deepcopy(result.metadata))
+
+        print(f"Job {label} completed with job id {job.job_id()}, submit_time: {submit_end-submit_start} and execution_time: {result_end - result_start}, type: {type(new_result)}")
+        return (label, new_result)
 
 def run_full_circuit(observable, backend_options, full_circuit_transpilation):
     estimator = EstimatorV2(options=backend_options)
