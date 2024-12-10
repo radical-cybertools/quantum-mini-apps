@@ -38,79 +38,78 @@ DEFAULT_SIMULATOR_BACKEND_OPTIONS = {"backend_options": {"device":"CPU", "method
 
 
 def execute_sampler(backend_options, label, subsystem_subexpts, shots):
-
     submit_start = time.time()
-    #backend = AerSimulator(backend_options)
     backend = AerSimulator(**backend_options["backend_options"])
-    # with Batch(backend=backend) as batch:
-    sampler = SamplerV2(backend=backend)
-    job = sampler.run(subsystem_subexpts, shots=shots)
-    submit_end = time.time()
-    result_start = time.time()
-    result = job.result()    
-    result_end = time.time()
-
-    # debug
-    for pub_result in result:
-        # Debugging statements to inspect pub_result
-        print("Attributes of pub_result:", dir(pub_result))
-        print("pub_result:", pub_result)
-        # Break after first iteration for debugging
-        break
-
-    # Reconstruct the PrimitiveResult object to fix serialization issues with current Qiskit versions (at the time 1.3)
-    # see https://github.com/Qiskit/qiskit/issues/12787
-    from qiskit.primitives.containers import PrimitiveResult, SamplerPubResult, DataBin, BitArray
     
-    # Override DataBin class to fix serialization issues
-    class CustomDataBin(DataBin):
-        def __setattr__(self, name, value):
-            super().__init__()
-            self.__dict__[name] = value
-                
-    # Reconstruct the PrimitiveResult object to fix serialization issues
-    new_results = []
-    for pub_result in result:
-        # Deep copy the metadata
-        new_metadata = copy.deepcopy(pub_result.metadata)
+    with Batch(backend=backend) as batch:
+        sampler = SamplerV2(mode=batch)
+        job = sampler.run(subsystem_subexpts, shots=shots)
+        submit_end = time.time()
+        result_start = time.time()
+        result = job.result()    
+        result_end = time.time()
 
-        # Access the DataBin object
-        data_bin = pub_result.data
+        # debug
+        for pub_result in result:
+            # Debugging statements to inspect pub_result
+            print("Attributes of pub_result:", dir(pub_result))
+            print("pub_result:", pub_result)
+            # Break after first iteration for debugging
+            break
 
-        # Reconstruct DataBin
-        new_data_bin_dict = {}
+        # Reconstruct the PrimitiveResult object to fix serialization issues with current Qiskit versions (at the time 1.3)
+        # see https://github.com/Qiskit/qiskit/issues/12787
+        from qiskit.primitives.containers import PrimitiveResult, SamplerPubResult, DataBin, BitArray
+        
+        # Override DataBin class to fix serialization issues
+        class CustomDataBin(DataBin):
+            def __setattr__(self, name, value):
+                super().__init__()
+                self.__dict__[name] = value
+                    
+        # Reconstruct the PrimitiveResult object to fix serialization issues
+        new_results = []
+        for pub_result in result:
+            # Deep copy the metadata
+            new_metadata = copy.deepcopy(pub_result.metadata)
 
-        # Explicitly copy 'observable_measurements'
-        if hasattr(data_bin, 'observable_measurements'):
-            observable_measurements = data_bin.observable_measurements
-            new_observable_array = np.copy(observable_measurements.array)
-            new_observable_bitarray = BitArray(new_observable_array, observable_measurements.num_bits)
-            new_data_bin_dict['observable_measurements'] = new_observable_bitarray
+            # Access the DataBin object
+            data_bin = pub_result.data
 
-        # Explicitly copy 'qpd_measurements'
-        if hasattr(data_bin, 'qpd_measurements'):
-            qpd_measurements = data_bin.qpd_measurements
-            new_qpd_array = np.copy(qpd_measurements.array)
-            new_qpd_bitarray = BitArray(new_qpd_array, qpd_measurements.num_bits)
-            new_data_bin_dict['qpd_measurements'] = new_qpd_bitarray
+            # Reconstruct DataBin
+            new_data_bin_dict = {}
 
-        # Copy other attributes of DataBin (e.g., 'shape')
-        if hasattr(data_bin, 'shape'):
-            new_data_bin_dict['shape'] = copy.deepcopy(data_bin.shape)
+            # Explicitly copy 'observable_measurements'
+            if hasattr(data_bin, 'observable_measurements'):
+                observable_measurements = data_bin.observable_measurements
+                new_observable_array = np.copy(observable_measurements.array)
+                new_observable_bitarray = BitArray(new_observable_array, observable_measurements.num_bits)
+                new_data_bin_dict['observable_measurements'] = new_observable_bitarray
 
-        # Create a new DataBin instance
-        new_data_bin = CustomDataBin(**new_data_bin_dict)
-        #new_data_bin.__setattr__ = custom_setattr
+            # Explicitly copy 'qpd_measurements'
+            if hasattr(data_bin, 'qpd_measurements'):
+                qpd_measurements = data_bin.qpd_measurements
+                new_qpd_array = np.copy(qpd_measurements.array)
+                new_qpd_bitarray = BitArray(new_qpd_array, qpd_measurements.num_bits)
+                new_data_bin_dict['qpd_measurements'] = new_qpd_bitarray
 
-        # Create a new SamplerPubResult
-        new_pub_result = SamplerPubResult(data=new_data_bin, metadata=new_metadata)
-        new_results.append(new_pub_result)
+            # Copy other attributes of DataBin (e.g., 'shape')
+            if hasattr(data_bin, 'shape'):
+                new_data_bin_dict['shape'] = copy.deepcopy(data_bin.shape)
 
-    # Create a new PrimitiveResult
-    new_result = PrimitiveResult(new_results, metadata=copy.deepcopy(result.metadata))
+            # Create a new DataBin instance
+            new_data_bin = CustomDataBin(**new_data_bin_dict)
+            #new_data_bin.__setattr__ = custom_setattr
 
-    print(f"Job {label} completed with job id {job.job_id()}, submit_time: {submit_end-submit_start} and execution_time: {result_end - result_start}, type: {type(new_result)}")
-    return (label, new_result)
+            # Create a new SamplerPubResult
+            new_pub_result = SamplerPubResult(data=new_data_bin, metadata=new_metadata)
+            new_results.append(new_pub_result)
+
+        # Create a new PrimitiveResult
+        new_result = PrimitiveResult(new_results, metadata=copy.deepcopy(result.metadata))
+
+        print(f"Job {label} completed with job id {job.job_id()}, submit_time: {submit_end-submit_start} and execution_time: {result_end - result_start}, type: {type(new_result)}")
+        return (label, new_result)
 
 def run_full_circuit(observable, backend_options, full_circuit_transpilation):
     estimator = EstimatorV2(options=backend_options)
@@ -125,6 +124,7 @@ class CircuitCuttingBuilder:
         self.observables = None
         self.scale_factor = None
         self.qiskit_backend_options = None
+        self.num_samples = 10
         self.sub_circuit_task_resources = {'num_cpus': 1, 'num_gpus': 0, 'memory': None}
 
     def set_subcircuit_size(self, subcircuit_size):
@@ -151,6 +151,10 @@ class CircuitCuttingBuilder:
         self.qiskit_backend_options = qiskit_backend_options
         return self
     
+    def set_num_samples(self, num_samples):
+        self.num_samples = num_samples
+        return self
+    
     def set_sub_circuit_task_resources(self, sub_circuit_task_resources):
         self.sub_circuit_task_resources = sub_circuit_task_resources
         return self
@@ -160,13 +164,13 @@ class CircuitCuttingBuilder:
         return self    
     
     def build(self, executor):
-        return CircuitCutting(executor, self.subcircuit_size, self.base_qubits, self.observables, self.scale_factor, self.qiskit_backend_options, self.sub_circuit_task_resources, self.full_circuit_task_resources, self.result_file)
+        return CircuitCutting(executor, self.subcircuit_size, self.base_qubits, self.observables, self.scale_factor, self.qiskit_backend_options, self.sub_circuit_task_resources, self.full_circuit_task_resources, self.result_file, self.num_samples)
 
 
 
 
 class CircuitCutting(Motif):
-    def __init__(self, executor, subcircuit_size, base_qubits, observables, scale_factor, qiskit_backend_options, sub_circuit_task_resources ,full_circuit_task_resources, result_file):
+    def __init__(self, executor, subcircuit_size, base_qubits, observables, scale_factor, qiskit_backend_options, sub_circuit_task_resources ,full_circuit_task_resources, result_file, num_samples):
         super().__init__(executor, base_qubits)
         self.subcircuit_size = subcircuit_size
         self.observables = observables
@@ -175,6 +179,7 @@ class CircuitCutting(Motif):
         self.qiskit_backend_options = qiskit_backend_options
         self.base_qubits = base_qubits
         self.experiment_start_time = datetime.datetime.now()
+        self.num_samples = num_samples
         self.sub_circuit_task_resources = sub_circuit_task_resources
         self.full_circuit_task_resources = full_circuit_task_resources
         header = ["experiment_start_time", "subcircuit_size", "base_qubits", "observables", "scale_factor", 
@@ -197,7 +202,7 @@ class CircuitCutting(Motif):
         
         self.logger = logger
 
-    def pre_processing(self):    
+    def pre_processing(self, num_samples=10):    
         circuit = EfficientSU2(self.base_qubits * self.scale_factor, entanglement="linear", reps=2).decompose()
         circuit.assign_parameters([0.4] * len(circuit.parameters), inplace=True)
 
@@ -233,7 +238,7 @@ class CircuitCutting(Motif):
         )
 
         subexperiments, coefficients = generate_cutting_experiments(
-            circuits=subcircuits, observables=subobservables, num_samples=1_000
+            circuits=subcircuits, observables=subobservables, num_samples=num_samples
         )
         self.logger.info(
             f"{len(subexperiments[0]) + len(subexperiments[1])} total subexperiments to run on backend."
@@ -246,7 +251,7 @@ class CircuitCutting(Motif):
 
          # start time
         start_find_cuts = time.time()
-        subexperiments, coefficients, subobservables, observable, circuit = self.pre_processing()
+        subexperiments, coefficients, subobservables, observable, circuit = self.pre_processing(self.num_samples)
         end_find_cuts = time.time()
         
         backend_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
@@ -356,3 +361,4 @@ SCALE_FACTOR= "scale_factor"
 SUB_CIRCUIT_TASK_RESOURCES = "sub_circuit_task_resources"
 FULL_CIRCUIT_TASK_RESOURCES = "full_circuit_task_resources"
 SIMULATOR_BACKEND_OPTIONS = "simulator_backend_options"
+NUM_SAMPLES = "num_samples"
