@@ -24,6 +24,7 @@ from qiskit_ibm_runtime import Batch, SamplerV2
 from engine.metrics.csv_writer import MetricsFileWriter
 from mini_apps.quantum_simulation.motifs.base_motif import Motif
 from mini_apps.quantum_simulation.motifs.qiskit_benchmark import generate_data
+
 from qiskit.primitives import (
     SamplerResult,  # for SamplerV1
     PrimitiveResult,  # for SamplerV2
@@ -36,16 +37,79 @@ import logging
 DEFAULT_SIMULATOR_BACKEND_OPTIONS = {"backend_options": {"device":"CPU", "method": "statevector"}}
 
 
-def execute_sampler(sampler, label, subsystem_subexpts, shots):
-    print(sampler, label, subsystem_subexpts, shots)
+def execute_sampler(backend_options, label, subsystem_subexpts, shots):
     submit_start = time.time()
+    #backend = AerSimulator(backend_options)
+    backend = AerSimulator(**backend_options["backend_options"])
+    # with Batch(backend=backend) as batch:
+    sampler = SamplerV2(backend=backend)
     job = sampler.run(subsystem_subexpts, shots=shots)
     submit_end = time.time()
     result_start = time.time()
     result = job.result()    
     result_end = time.time()
-    print(f"Job {label} completed with job id {job.job_id()}, submit_time: {submit_end-submit_start} and execution_time: {result_end - result_start}, type: {type(result)}")
-    return (label, result)
+
+    # debug
+    for pub_result in result:
+        # Debugging statements to inspect pub_result
+        print("Attributes of pub_result:", dir(pub_result))
+        print("pub_result:", pub_result)
+        # Break after first iteration for debugging
+        break
+
+    # Reconstruct the PrimitiveResult object to fix serialization issues with current Qiskit versions (at the time 1.3)
+    # see https://github.com/Qiskit/qiskit/issues/12787
+    from qiskit.primitives.containers import PrimitiveResult, SamplerPubResult, DataBin, BitArray
+    
+    # Override DataBin class to fix serialization issues
+    class CustomDataBin(DataBin):
+        def __setattr__(self, name, value):
+            super().__init__()
+            self.__dict__[name] = value
+                
+    # Reconstruct the PrimitiveResult object to fix serialization issues
+    new_results = []
+    for pub_result in result:
+        # Deep copy the metadata
+        new_metadata = copy.deepcopy(pub_result.metadata)
+
+        # Access the DataBin object
+        data_bin = pub_result.data
+
+        # Reconstruct DataBin
+        new_data_bin_dict = {}
+
+        # Explicitly copy 'observable_measurements'
+        if hasattr(data_bin, 'observable_measurements'):
+            observable_measurements = data_bin.observable_measurements
+            new_observable_array = np.copy(observable_measurements.array)
+            new_observable_bitarray = BitArray(new_observable_array, observable_measurements.num_bits)
+            new_data_bin_dict['observable_measurements'] = new_observable_bitarray
+
+        # Explicitly copy 'qpd_measurements'
+        if hasattr(data_bin, 'qpd_measurements'):
+            qpd_measurements = data_bin.qpd_measurements
+            new_qpd_array = np.copy(qpd_measurements.array)
+            new_qpd_bitarray = BitArray(new_qpd_array, qpd_measurements.num_bits)
+            new_data_bin_dict['qpd_measurements'] = new_qpd_bitarray
+
+        # Copy other attributes of DataBin (e.g., 'shape')
+        if hasattr(data_bin, 'shape'):
+            new_data_bin_dict['shape'] = copy.deepcopy(data_bin.shape)
+
+        # Create a new DataBin instance
+        new_data_bin = CustomDataBin(**new_data_bin_dict)
+        #new_data_bin.__setattr__ = custom_setattr
+
+        # Create a new SamplerPubResult
+        new_pub_result = SamplerPubResult(data=new_data_bin, metadata=new_metadata)
+        new_results.append(new_pub_result)
+
+    # Create a new PrimitiveResult
+    new_result = PrimitiveResult(new_results, metadata=copy.deepcopy(result.metadata))
+
+    print(f"Job {label} completed with job id {job.job_id()}, submit_time: {submit_end-submit_start} and execution_time: {result_end - result_start}, type: {type(new_result)}")
+    return (label, new_result)
 
 def run_full_circuit(observable, backend_options, full_circuit_transpilation):
     estimator = EstimatorV2(options=backend_options)
@@ -140,10 +204,10 @@ class CircuitCutting(Motif):
 
     def pre_processing(self, num_samples=10):    
         circuit = EfficientSU2(self.base_qubits * self.scale_factor, entanglement="linear", reps=2).decompose()
-        circuit.assign_parameters([0.4] * len(circuit.parameters), inplace=True)        
+        circuit.assign_parameters([0.4] * len(circuit.parameters), inplace=True)
+
         observable = SparsePauliOp([o * self.scale_factor for o in self.observables])
-        self.logger.info(f"Number of qubits in the circuit: {circuit.num_qubits}")
-        
+
         # Specify settings for the cut-finding optimizer
         optimization_settings = OptimizationParameters(seed=111)
 
@@ -152,8 +216,9 @@ class CircuitCutting(Motif):
 
         cut_circuit, metadata = find_cuts(circuit, optimization_settings, device_constraints)
         self.logger.info(
+            f'Full circuit size: {len(circuit.qubits)} \n'            
             f'Found solution using {len(metadata["cuts"])} cuts with a sampling '
-            f'overhead of {metadata["sampling_overhead"]}.\n'
+            f'Sampling overhead of {metadata["sampling_overhead"]}.\n'
             f'Lowest cost solution found: {metadata["minimum_reached"]}.'
         )
         for cut in metadata["cuts"]:
@@ -178,11 +243,16 @@ class CircuitCutting(Motif):
         self.logger.info(
             f"{len(subexperiments[0]) + len(subexperiments[1])} total subexperiments to run on backend."
         )
+        
         return subexperiments, coefficients, subobservables, observable, circuit
 
             
     def run(self):
+
+         # start time
+        start_find_cuts = time.time()
         subexperiments, coefficients, subobservables, observable, circuit = self.pre_processing(self.num_samples)
+        end_find_cuts = time.time()
         
         backend_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
         if self.qiskit_backend_options:
@@ -190,44 +260,47 @@ class CircuitCutting(Motif):
         self.logger.info(f"Backend options: {backend_options}")
         backend = AerSimulator(**backend_options["backend_options"])
         
-        traspile_start_time = time.time()
+        transpile_start_time = time.time()
         self.logger.info("*********************************** transpiling circuits ***********************************")
         # Transpile the subexperiments to ISA circuits
         pass_manager = generate_preset_pass_manager(optimization_level=1, backend=backend)
-        # isa_subexperiments = {}
-        
-        isa_subexperiments = {
-                label: pass_manager.run(partition_subexpts)
-                for label, partition_subexpts in subexperiments.items()
-        }          
-        
-        # for label, partition_subexpts in subexperiments.items():
-        #     isa_subexperiments[label] = pass_manager.run(partition_subexpts)
-        self.logger.info("*********************************** transpiling done ***********************************")
-        traspile_end_time = time.time()
-        transpile_time_secs = traspile_end_time - traspile_start_time
+        isa_subexperiments = {}
+        for label, partition_subexpts in subexperiments.items():
+            isa_subexperiments[label] = pass_manager.run(partition_subexpts)
+        self.logger.info("*********************************** transpiling done ***************************************")
+        transpile_end_time = time.time()
+        transpile_time_secs = transpile_end_time - transpile_start_time
         self.logger.info(f"Transpile time: {transpile_time_secs}")
-        
-    
+            
         tasks=[]
         i=0
         sub_circuit_execution_time = time.time()
         resources = copy.copy(self.sub_circuit_task_resources)
-        with Batch(backend=backend) as batch:
-            sampler = SamplerV2(mode=batch)
-            self.logger.info(f"*********************************** len of subexperiments {len(isa_subexperiments)}*************************")
-            for label, subsystem_subexpts in isa_subexperiments.items():
-                self.logger.info(f"*********************************** len of subsystem_subexpts {len(subsystem_subexpts)}*************************")
-                for ss in subsystem_subexpts:                                        
-                    task_future = self.executor.submit_task(execute_sampler, sampler, label, [ss], shots=2**12, resources=resources)                    
-                    tasks.append(task_future)
-                    i=i+1
+                  
+        self.logger.info(f"********************** len of subexperiments {len(isa_subexperiments)}********************")
+        results_tuple = []
+        use_ray = True
+        for label, subsystem_subexpts in isa_subexperiments.items():
+            self.logger.info(len(subsystem_subexpts))
+            if use_ray:
+                # parallel version with Ray
+                task_future = self.executor.submit_task(execute_sampler, backend_options, label, subsystem_subexpts, resources=resources, shots=2**12)
+                tasks.append(task_future)
+            else:
+                # sequential version
+                result = execute_sampler(backend_options, label, subsystem_subexpts, shots=2**12)
+                print(result)
+                results_tuple.append(result)
+            
+            i = i + 1
 
-        results_tuple=self.executor.get_results(tasks)
+        # temporary fix for the parallel version
+        if use_ray: results_tuple=self.executor.get_results(tasks)
+        
         sub_circuit_execution_end_time = time.time()
         subcircuit_exec_time_secs = sub_circuit_execution_end_time - sub_circuit_execution_time
         self.logger.info(f"Execution time for subcircuits: {subcircuit_exec_time_secs}")
-                
+        print(str(results_tuple))
         # Get all samplePubResults            
         samplePubResults = collections.defaultdict(list)
         for result in results_tuple:
@@ -266,7 +339,7 @@ class CircuitCutting(Motif):
         exact_expval = self.executor.get_results([full_circuit_task])
         full_circuit_estimator_runtime = time.time()-full_circuit_estimator_time
         
-        self.logger.info(f"Execution time for full Circuit: {full_circuit_estimator_runtime}")         
+        self.logger.info(f"Execution time for full circuit: {full_circuit_estimator_runtime}")         
         self.logger.info(f"Reconstructed expectation value: {np.real(np.round(final_expval, 8))}")
         self.logger.info(f"Exact expectation value: {np.round(exact_expval, 8)}")
         error_in_estimation=np.real(np.round(final_expval-exact_expval, 8))
