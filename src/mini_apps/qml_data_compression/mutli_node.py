@@ -4,6 +4,7 @@ import numpy as np
 
 # Define the paths and corresponding values
 data_info = {
+    1: '/pscratch/sd/f/fkiwit/work_nodes1_2/20241006_024740/result_compression_20241006_024740.csv',
     2: '/pscratch/sd/f/fkiwit/work_okt01/20241002_081925/result_compression_20241002_081925.csv',
     4: '/pscratch/sd/f/fkiwit/work_okt01/20241002_122210/result_compression_20241002_122210.csv',
     8: '/pscratch/sd/f/fkiwit/work_okt01/20241002_053626/result_compression_20241002_053626.csv',
@@ -37,19 +38,17 @@ axs[0].set_xlim(-0.5, len(nodes) - 0.5)
 
 # Calculate the speedup relative to the first compute time
 base_time = compute_times[0]
-speedup = [base_time / time for time in compute_times]
+eff = [100 * base_time / time / node for time, node in zip(compute_times, nodes)]
 
 # Plot the speedup as a function of the values
-axs[1].plot(labels_position, speedup, marker='o')
+axs[1].axhline(y=100, color='black', linestyle='--')
+axs[1].plot(labels_position, eff, marker='o')
 axs[1].set_xlabel('Nodes')
-axs[1].set_ylabel('Speedup')
+axs[1].set_ylabel('Efficiency [%]')
 axs[1].set_xticks(labels_position)
 axs[1].set_xticklabels(nodes)
-# axs[1].set_yticks(range(1, 13))
-# axs[1].set_yticklabels(range(1, 13))
 axs[1].set_xlim(-0.5, len(nodes) - 0.5)
-axs[1].set_ylim(0, 9)
-
+axs[1].set_ylim(0, 110)
 
 plt.tight_layout()
 fig.savefig('multi_node.pdf')

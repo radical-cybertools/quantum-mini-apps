@@ -97,7 +97,7 @@ if __name__ == "__main__":
     }
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    WORKING_DIRECTORY = os.path.join(os.environ["PSCRATCH"], f"work_nodes1_2/{timestamp}")
+    WORKING_DIRECTORY = os.path.join(os.environ["PSCRATCH"], f"work_nodes16_32/{timestamp}")
     RESOURCE_URL_HPC = "slurm://localhost"
 
     os.makedirs(WORKING_DIRECTORY, exist_ok=True)

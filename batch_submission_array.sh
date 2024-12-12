@@ -10,10 +10,13 @@
 #SBATCH --array=0-1
 
 # Array of node counts (1, 2, 4, 8, 16, 32)
-node_counts=(1 2)
+node_counts=(16 32)
 
 # Get the node count for the current job array task
 num_nodes=${node_counts[$SLURM_ARRAY_TASK_ID]}
 
 # Run the Python script with the current node count
 python src/mini_apps/qml_data_compression/qml_compression.py --num_nodes $num_nodes
+
+
+20241008_003205

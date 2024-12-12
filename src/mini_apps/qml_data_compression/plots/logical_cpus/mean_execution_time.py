@@ -29,6 +29,9 @@ ratios = []
 throughtput = []
 for i, run in enumerate(runs):
     times_mean, n_processed = get_times_data(run)
+    print(f"labels i {labels[i]}")
+    if labels[i] == 256:
+        print(times_mean['time_bfgs'] / (times_mean['time_sweep'] + times_mean['time_bfgs']))
     axs[0].bar(labels_position[i], times_mean['time_sweep'], bottom=0, color="tab:blue")
     axs[0].bar(labels_position[i], times_mean['time_bfgs'], bottom=times_mean['time_sweep'], color="tab:orange")
     ratios.append((times_mean['time_bfgs'] + times_mean['time_sweep']) / labels[i])
@@ -50,5 +53,4 @@ axs[1].set_xlabel("Logical CPUs")
 axs[1].set_ylabel("Throughput [s^-1]")
 
 axs[0].set_title("2 Nodes with 2x AMD EPYC 7763 (512 threads total)")
-plt.tight_layout()
 plt.savefig("times.pdf")

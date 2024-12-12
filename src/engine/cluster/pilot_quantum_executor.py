@@ -50,6 +50,7 @@ class PilotQuantumExecutor(Executor):
         input_tasks = args[0]  # The first argument is the collection of tasks
         args = args[1:]  # Remove the first argument
         
+        # return [self.pilot.submit_task(compute_func, task, *args, resources={'num_cpus': 1, 'num_gpus': 1, 'memory': None}) for task in input_tasks]
         return [self.pilot.submit_task(compute_func, task, *args) for task in input_tasks]
 
 

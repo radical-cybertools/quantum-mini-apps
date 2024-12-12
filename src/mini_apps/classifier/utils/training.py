@@ -13,6 +13,19 @@ import yaml
 import os
 from datetime import datetime
 
+# import subprocess
+# def get_gpu_memory(gpu_index):
+#     result = subprocess.check_output(
+#         [
+#             'nvidia-smi', f'--id={gpu_index}',
+#             '--query-gpu=memory.total,memory.used,memory.free',
+#             '--format=csv,nounits,noheader'
+#         ],
+#         encoding='utf-8'
+#     )
+#     total, used, free = result.strip().split(',')
+#     return int(total), int(used), int(free)
+
 
 """
 Experimental design:
@@ -48,13 +61,10 @@ Engineering:
 """
 
 def training(config):
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    basepath_results = f"/pscratch/sd/f/fkiwit/work_classifier/j{config['jit']}_v{config['vmap']}_b{config['batch_size']}_{timestamp}"
-    os.makedirs(basepath_results, exist_ok=True)
-    # jax.config.update("jax_compilation_cache_dir", "jit_compiled")
     jax.config.update('jax_platform_name', config["device"])
     jax.config.update("jax_enable_x64", True)
+    device = jax.devices()[0]
+    # gpu_index = device.id
     times = {}
 
     dev = qml.device("default.qubit")
@@ -91,21 +101,26 @@ def training(config):
             outputs.append(output)
         return jnp.stack(outputs)
 
-    # vmap
-    if config["vmap"]:
-        model = vmap(model_base, in_axes=(None, 0))
-        cost_fn = vmap(cost_fn_base, in_axes=(None, 0, 0))
-        grad_fn = vmap(grad_fn_base, in_axes=(None, 0, 0))
-    else:
-        model = partial(map_over_inputs, model_base)
-        cost_fn = partial(map_over_inputs, cost_fn_base)
-        grad_fn = partial(map_over_inputs, grad_fn_base)
-
     # JIT compilation
     if config["jit"]:
-        model = jit(model)
-        cost_fn = jit(cost_fn)
-        grad_fn = jit(grad_fn)
+        model = jit(model_base)
+        cost_fn = jit(cost_fn_base)
+        grad_fn = jit(grad_fn_base)
+    else:
+        model = model_base
+        cost_fn = cost_fn_base
+        grad_fn = grad_fn_base
+
+    # vmap
+    if config["vmap"]:
+        model = vmap(model, in_axes=(None, 0))
+        cost_fn = vmap(cost_fn, in_axes=(None, 0, 0))
+        grad_fn = vmap(grad_fn, in_axes=(None, 0, 0))
+    else:
+        model = partial(map_over_inputs, model)
+        cost_fn = partial(map_over_inputs, cost_fn)
+        grad_fn = partial(map_over_inputs, grad_fn)
+
 
     # Load data
     basepath = "/global/homes/f/fkiwit/dev/data_compression/results/cifar_new"
@@ -148,7 +163,7 @@ def training(config):
     opt_state = solver.init(weights)
     print(f"Starting optimization with training inputs of shape {states_train.shape}")
 
-    start = perf_counter()
+    start_training = perf_counter()
     times_training_loop = []
     for epoch in range(config["n_epochs"]):
         epoch_loss = 0
@@ -169,6 +184,13 @@ def training(config):
 
                 pbar.set_postfix(loss=str(loss)[:5], accuracy=str(accuracy)[:5])
                 pbar.update(1)
+
+            # total, used, free = get_gpu_memory(gpu_index)
+            # memory_info_dict = {
+            #     "total_memory": total,
+            #     "used_memory": used,
+            #     "free_memory": free
+            # }
 
         epoch_loss /= n_batches
         epoch_accuracy /= n_batches
@@ -192,7 +214,7 @@ def training(config):
 
         print(f"Epoch {epoch+1}/{config['n_epochs']} - Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy:.4f}, Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.4f}")
 
-    times["time_training"] = perf_counter() - start
+    times["time_training"] = perf_counter() - start_training
 
     results_np = {
         "times_training_loop": np.array(times_training_loop),
@@ -205,12 +227,15 @@ def training(config):
 
     results_dict = {
         "config": config,
-        "times": times
+        "times": times,
+        # "memory_info": memory_info_dict
     }
 
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    basepath_results = f"/pscratch/sd/f/fkiwit/work_classifier/j{config['jit']}_v{config['vmap']}_b{config['batch_size']}_{timestamp}"
+    os.makedirs(basepath_results, exist_ok=True)
+
     for key, value in results_np.items():
-        print(f"{key}: {value.shape}")
-        print(basepath_results)
         np.save(f"{basepath_results}/{key}.npy", value, allow_pickle=True)
 
     for key, value in results_dict.items():
@@ -221,12 +246,12 @@ if __name__ == "__main__":
     # Set hyperparameters
     config = {
         "n_qubits": 13,
-        "depth": 2,
-        "batch_size": 80,
-        "n_batches": 10,
-        "n_epochs": 2,
-        "jit": True,
-        "vmap": True,
+        "depth": 1,
+        "batch_size": 2,
+        "n_batches": 1,
+        "n_epochs": 1,
+        "jit": False,
+        "vmap": False,
         "device": "gpu"
     }
     training(config)
