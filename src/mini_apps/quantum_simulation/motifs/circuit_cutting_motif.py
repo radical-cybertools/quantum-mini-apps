@@ -182,8 +182,7 @@ class CircuitCutting(Motif):
         self.num_samples = num_samples
         self.sub_circuit_task_resources = sub_circuit_task_resources
         self.full_circuit_task_resources = full_circuit_task_resources
-        header = ["experiment_start_time", "subcircuit_size", "base_qubits", "observables", "scale_factor", 
-                  "transpile_time_secs", "subcircuit_exec_time_secs", "reconstruct_subcircuit_expectations_time_secs", "full_circuit_estimator_runtime", "error_in_estimation"]
+        header = ["experiment_start_time", "subcircuit_size", "base_qubits", "observables", "scale_factor", "find_cuts_time", "transpile_time_secs", "subcircuit_exec_time_secs", "reconstruct_subcircuit_expectations_time_secs", "full_circuit_estimator_runtime", "error_in_estimation"]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
         # Create a logger
         logger = logging.getLogger(__name__)
@@ -281,7 +280,8 @@ class CircuitCutting(Motif):
         results_tuple = []
         use_ray = True
         for label, subsystem_subexpts in isa_subexperiments.items():
-            self.logger.info(len(subsystem_subexpts))
+            #self.logger.info(len(subsystem_subexpts))
+            self.logger.info(f"*************** len of subsystem_subexpts {len(subsystem_subexpts)}**********")
             if use_ray:
                 # parallel version with Ray
                 task_future = self.executor.submit_task(execute_sampler, backend_options, label, subsystem_subexpts, resources=resources, shots=2**12)
@@ -349,7 +349,7 @@ class CircuitCutting(Motif):
         )                    
 
         self.metrics_file_writer.write([self.experiment_start_time, self.subcircuit_size, self.base_qubits, 
-                                        self.observables, self.scale_factor, transpile_time_secs, subcircuit_exec_time_secs, reconstruct_subcircuit_expectations_time_secs, full_circuit_estimator_runtime,error_in_estimation])
+                                        self.observables, self.scale_factor, end_find_cuts-start_find_cuts, transpile_time_secs, subcircuit_exec_time_secs, reconstruct_subcircuit_expectations_time_secs, full_circuit_estimator_runtime, float(error_in_estimation)])
 
         self.metrics_file_writer.close()
 
