@@ -55,11 +55,11 @@ if __name__ == "__main__":
 
             cc_parameters = {
                 SUBCIRCUIT_SIZE : 2,
-                BASE_QUBITS: 7,
-                SCALE_FACTOR : 1,
-                OBSERVABLES: ["ZIIIIII", "IIIZIII", "IIIIIII"], 
+                BASE_QUBITS: 8,
+                SCALE_FACTOR : 4,
+                OBSERVABLES: ["ZIIIIIII", "IIIIZIII", "IIIIIIII"], 
                 SUB_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 1, 'memory': None},
-                FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 64, 'num_gpus': 1, 'memory': None},
+                FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 64, 'num_gpus': 4, 'memory': None},
                 SIMULATOR_BACKEND_OPTIONS: {"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}}
             }
 

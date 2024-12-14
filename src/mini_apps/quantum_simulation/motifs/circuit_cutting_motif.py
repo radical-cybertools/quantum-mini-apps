@@ -247,7 +247,6 @@ class CircuitCutting(Motif):
 
             
     def run(self):
-
          # start time
         start_find_cuts = time.time()
         subexperiments, coefficients, subobservables, observable, circuit = self.pre_processing(self.num_samples)
@@ -283,9 +282,10 @@ class CircuitCutting(Motif):
             #self.logger.info(len(subsystem_subexpts))
             self.logger.info(f"*************** len of subsystem_subexpts {len(subsystem_subexpts)}**********")
             if use_ray:
-                # parallel version with Ray
-                task_future = self.executor.submit_task(execute_sampler, backend_options, label, subsystem_subexpts, resources=resources, shots=2**12)
-                tasks.append(task_future)
+                for ss in subsystem_subexpts:
+                    # parallel version with Ray
+                    task_future = self.executor.submit_task(execute_sampler, backend_options, label, [ss], resources=resources, shots=2**12)
+                    tasks.append(task_future)
             else:
                 # sequential version
                 result = execute_sampler(backend_options, label, subsystem_subexpts, shots=2**12)
