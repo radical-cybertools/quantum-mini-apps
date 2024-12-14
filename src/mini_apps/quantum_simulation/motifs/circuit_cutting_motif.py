@@ -182,22 +182,24 @@ class CircuitCutting(Motif):
         self.num_samples = num_samples
         self.sub_circuit_task_resources = sub_circuit_task_resources
         self.full_circuit_task_resources = full_circuit_task_resources
-        header = ["experiment_start_time", "subcircuit_size", "base_qubits", "observables", "scale_factor", "find_cuts_time", "transpile_time_secs", "subcircuit_exec_time_secs", "reconstruct_subcircuit_expectations_time_secs", "full_circuit_estimator_runtime", "error_in_estimation"]
+        header = ["experiment_start_time", "subcircuit_size", "base_qubits", "observables", "scale_factor", "num_samples", "find_cuts_time", "transpile_time_secs", "subcircuit_exec_time_secs", "reconstruct_subcircuit_expectations_time_secs", "full_circuit_estimator_runtime", "error_in_estimation"]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
         # Create a logger
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.INFO)
 
-        # Create a console handler and set the log level
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
+        # Check if the logger already has handlers to prevent duplicates
+        if not logger.hasHandlers():
+            # Create a console handler and set the log level
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
 
-        # Create a formatter and add it to the console handler
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        console_handler.setFormatter(formatter)
+            # Create a formatter and add it to the console handler
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            console_handler.setFormatter(formatter)
 
-        # Add the console handler to the logger
-        logger.addHandler(console_handler)
+            # Add the console handler to the logger
+            logger.addHandler(console_handler)
         
         self.logger = logger
 
@@ -350,7 +352,7 @@ class CircuitCutting(Motif):
         )                    
 
         self.metrics_file_writer.write([self.experiment_start_time, self.subcircuit_size, self.base_qubits, 
-                                        self.observables, self.scale_factor, end_find_cuts-start_find_cuts, transpile_time_secs, subcircuit_exec_time_secs, reconstruct_subcircuit_expectations_time_secs, full_circuit_estimator_runtime, float(error_in_estimation)])
+                                        self.observables, self.scale_factor, self.num_samples, end_find_cuts-start_find_cuts, transpile_time_secs, subcircuit_exec_time_secs, reconstruct_subcircuit_expectations_time_secs, full_circuit_estimator_runtime, float(error_in_estimation)])
 
         self.metrics_file_writer.close()
 

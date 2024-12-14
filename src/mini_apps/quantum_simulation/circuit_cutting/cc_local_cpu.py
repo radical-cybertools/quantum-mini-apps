@@ -83,13 +83,13 @@ if __name__ == "__main__":
     logger.setLevel(logging.DEBUG)
 
     
-    circuit_sizes = [8]
+    circuit_sizes = [8, 16, 24]
     subcircuit_sizes = {circuit_size: [size for size in range(2, circuit_size // 2 + 1, 2)] for circuit_size in circuit_sizes}
     #subcircuit_sizes = {8: [4]}
 
     for circuit_size in circuit_sizes:
         for subcircuit_size in subcircuit_sizes[circuit_size]:
-            for num_samples in [10]:
+            for num_samples in [10, 100, 1000, 100000]:
                 try:
                     cluster_info = {       
                         "executor": "pilot",
