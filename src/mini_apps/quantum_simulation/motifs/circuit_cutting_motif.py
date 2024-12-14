@@ -288,9 +288,10 @@ class CircuitCutting(Motif):
                     tasks.append(task_future)
             else:
                 # sequential version
-                result = execute_sampler(backend_options, label, subsystem_subexpts, shots=2**12)
-                print(result)
-                results_tuple.append(result)
+                for ss in subsystem_subexpts:
+                    result = execute_sampler(backend_options, label, [ss], shots=2**12)
+                    print(result)
+                    results_tuple.append(result)
             
             i = i + 1
 

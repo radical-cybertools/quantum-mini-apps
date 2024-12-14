@@ -2,6 +2,10 @@ import os
 import sys
 import math
 import datetime
+import time
+import logging
+import psutil
+import subprocess
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
@@ -15,6 +19,32 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+def kill_processes_by_keyword(keyword):
+    """
+    Kills all processes whose command line contains the specified keyword.
+    """
+    for proc in psutil.process_iter(attrs=["pid", "name", "cmdline"]):
+        try:
+            # Check if the process's command line contains the keyword
+            if proc.info["cmdline"] and any(keyword in arg for arg in proc.info["cmdline"]):
+                pid = proc.info["pid"]
+                print(f"Killing process {pid} ({proc.info['name']}) with command: {proc.info['cmdline']}")
+                proc.kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            # Process may have terminated or we don't have permissions
+            pass
+
+def stop_ray():
+    try:
+        # Execute the "ray stop" command
+        result = subprocess.run(['ray', 'stop'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        print("Ray stopped successfully.")
+        print(result.stdout)
+    except subprocess.CalledProcessError as e:
+        print("Error stopping Ray:")
+        print(e.stderr)
+
 
 class QuantumSimulation:
     def __init__(self, cluster_config, parameters=None):
@@ -35,43 +65,59 @@ class QuantumSimulation:
 
         # pdb.set_trace()
         cc.run()
+    
+    def close(self):
+        self.executor.close()
+        # hack terminate all agents 
+        kill_processes_by_keyword('pilot.plugins.ray_v2.agent')
+        stop_ray()
+  
 
 
 if __name__ == "__main__":
     RESOURCE_URL_HPC = "ssh://localhost"
     WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
+
+    # Create a logger
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+
     
-    circuit_sizes = [8, 16, ]
+    circuit_sizes = [8]
     subcircuit_sizes = {circuit_size: [size for size in range(2, circuit_size // 2 + 1, 2)] for circuit_size in circuit_sizes}
+    #subcircuit_sizes = {8: [4]}
 
     for circuit_size in circuit_sizes:
         for subcircuit_size in subcircuit_sizes[circuit_size]:
-            try:
-                cluster_info = {       
-                    "executor": "pilot",
-                    "config": {
-                        "resource": RESOURCE_URL_HPC,
-                        "working_directory": WORKING_DIRECTORY,
-                        "type": "ray",
-                        "number_of_nodes": 1,
-                        "cores_per_node": 10,
-                        "gpus_per_node": 4,
+            for num_samples in [10]:
+                try:
+                    cluster_info = {       
+                        "executor": "pilot",
+                        "config": {
+                            "resource": RESOURCE_URL_HPC,
+                            "working_directory": WORKING_DIRECTORY,
+                            "type": "ray",
+                            "number_of_nodes": 1,
+                            "cores_per_node": 10,
+                            "gpus_per_node": 0,
+                        }
                     }
-                }
 
-                cc_parameters = {
-                    SUBCIRCUIT_SIZE : subcircuit_size,
-                    BASE_QUBITS: circuit_size,
-                    SCALE_FACTOR : 1,
-                    OBSERVABLES:  ["Z" + "I" * (circuit_size - 1)], # ["ZIIIIII", "IIIZIII", "IIIIIII"], 
-                    NUM_SAMPLES: 100,
-                    SUB_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None},
-                    FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None},
-                    # SIMULATOR_BACKEND_OPTIONS: {"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}}
-                }
-                qs = QuantumSimulation(cluster_info, cc_parameters)
-                qs.run()
-                #qs.close()
-            except Exception as e:
-                print(f"Error: {e}")
-                raise e
+                    cc_parameters = {
+                        SUBCIRCUIT_SIZE : subcircuit_size,
+                        BASE_QUBITS: circuit_size,
+                        SCALE_FACTOR : 1,
+                        OBSERVABLES:  ["Z" + "I" * (circuit_size - 1)], # ["ZIIIIII", "IIIZIII", "IIIIIII"], 
+                        NUM_SAMPLES: num_samples,
+                        SUB_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None},
+                        FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None},
+                        # SIMULATOR_BACKEND_OPTIONS: {"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}}
+                    }
+                    qs = QuantumSimulation(cluster_info, cc_parameters)
+                    qs.run()
+                    logger.debug("Stop Executor")
+                    qs.close()
+                    #time.sleep(60)
+                except Exception as e:
+                    print(f"Error: {e}")
+                    raise e
