@@ -19,7 +19,7 @@ from mini_apps.quantum_simulation.motifs.circuit_cutting_motif import (
     SUB_CIRCUIT_TASK_RESOURCES,
     SUBCIRCUIT_SIZE,
     FULL_CIRCUIT_TASK_RESOURCES,
-    CircuitCuttingBuilder,
+    CircuitCuttingBuilder
 )
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -112,52 +112,54 @@ if __name__ == "__main__":
     }
     # subcircuit_sizes = {8: [4]}
 
-    for circuit_size in circuit_sizes:
-        for subcircuit_size in subcircuit_sizes[circuit_size]:
-            for num_samples in [10, 100, 1000, 10000]:
-                try:
-                    cluster_info = {
-                        "executor": "pilot",
-                        "config": {
-                            "resource": RESOURCE_URL_HPC,
-                            "working_directory": WORKING_DIRECTORY,
-                            "type": "ray",
-                            "number_of_nodes": 1,
-                            "cores_per_node": 10,
-                            "gpus_per_node": 0,
-                        },
-                    }
+    for num_cores_per_node in [256, 128, 64]:
+        for circuit_size in circuit_sizes:
+            for subcircuit_size in subcircuit_sizes[circuit_size]:
+                for num_samples in [10, 100, 1000, 10000]:
+                
+                    try:
+                        cluster_info = {
+                            "executor": "pilot",
+                            "config": {
+                                "resource": RESOURCE_URL_HPC,
+                                "working_directory": WORKING_DIRECTORY,
+                                "type": "ray",
+                                "number_of_nodes": 1,
+                                "cores_per_node": num_cores_per_node,
+                                "gpus_per_node": 0,
+                            },
+                        }
 
-                    cc_parameters = {
-                        SUBCIRCUIT_SIZE: subcircuit_size,
-                        BASE_QUBITS: circuit_size,
-                        SCALE_FACTOR: 1,
-                        OBSERVABLES: [
-                            "Z" + "I" * (circuit_size - 1)
-                        ],  # ["ZIIIIII", "IIIZIII", "IIIIIII"],
-                        NUM_SAMPLES: num_samples,
-                        SUB_CIRCUIT_TASK_RESOURCES: {
-                            "num_cpus": 1,
-                            "num_gpus": 0,
-                            "memory": None,
-                        },
-                        FULL_CIRCUIT_TASK_RESOURCES: {
-                            "num_cpus": 1,
-                            "num_gpus": 0,
-                            "memory": None,
-                        },
-                        # SIMULATOR_BACKEND_OPTIONS: {"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}}
-                    }
+                        cc_parameters = {
+                            SUBCIRCUIT_SIZE: subcircuit_size,
+                            BASE_QUBITS: circuit_size,
+                            SCALE_FACTOR: 1,
+                            OBSERVABLES: [
+                                "Z" + "I" * (circuit_size - 1)
+                            ],  # ["ZIIIIII", "IIIZIII", "IIIIIII"],
+                            NUM_SAMPLES: num_samples,
+                            SUB_CIRCUIT_TASK_RESOURCES: {
+                                "num_cpus": 1,
+                                "num_gpus": 0,
+                                "memory": None,
+                            },
+                            FULL_CIRCUIT_TASK_RESOURCES: {
+                                "num_cpus": 1,
+                                "num_gpus": 0,
+                                "memory": None,
+                            },
+                            # SIMULATOR_BACKEND_OPTIONS: {"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}}
+                        }
 
-                    logger.info(
-                        f"******* Running simulation with configuration: cluster_info={cluster_info}, cc_parameters={cc_parameters}"
-                    )
+                        logger.info(
+                            f"******* Running simulation with configuration: cluster_info={cluster_info}, cc_parameters={cc_parameters}"
+                        )
 
-                    qs = QuantumSimulation(cluster_info, cc_parameters)
-                    qs.run()
-                    logger.debug("Stop Executor")
-                    qs.close()
-                    # time.sleep(60)
-                except Exception as e:
-                    print(f"Error: {e}")
-                    raise e
+                        qs = QuantumSimulation(cluster_info, cc_parameters)
+                        qs.run()
+                        logger.debug("Stop Executor")
+                        qs.close()
+                        # time.sleep(60)
+                    except Exception as e:
+                        print(f"Error: {e}")
+                        raise e

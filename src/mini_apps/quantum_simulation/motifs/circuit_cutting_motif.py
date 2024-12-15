@@ -233,7 +233,9 @@ class CircuitCutting(Motif):
             "observables",
             "scale_factor",
             "num_samples",
+            "number_of_tasks",
             "metadata",
+            "cluster_config",
             "find_cuts_time",
             "transpile_time_secs",
             "subcircuit_exec_time_secs",
@@ -356,6 +358,7 @@ class CircuitCutting(Motif):
         )
         results_tuple = []
         use_ray = True
+        number_of_tasks = 0 
         for label, subsystem_subexpts in isa_subexperiments.items():
             # self.logger.info(len(subsystem_subexpts))
             self.logger.info(
@@ -373,12 +376,14 @@ class CircuitCutting(Motif):
                         shots=2**12,
                     )
                     tasks.append(task_future)
+                    number_of_tasks = number_of_tasks + 1 
             else:
                 # sequential version
                 for ss in subsystem_subexpts:
                     result = execute_sampler(backend_options, label, [ss], shots=2**12)
                     print(result)
                     results_tuple.append(result)
+                    number_of_tasks = number_of_tasks + 1 
 
             i = i + 1
 
@@ -460,7 +465,9 @@ class CircuitCutting(Motif):
                 self.observables,
                 self.scale_factor,
                 self.num_samples,
+                number_of_tasks,
                 str(self.metadata),
+                str(self.executor.cluster_config),
                 end_find_cuts - start_find_cuts,
                 transpile_time_secs,
                 subcircuit_exec_time_secs,
