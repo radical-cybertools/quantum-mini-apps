@@ -19,6 +19,8 @@ from mini_apps.quantum_simulation.motifs.circuit_cutting_motif import (
     SUB_CIRCUIT_TASK_RESOURCES,
     SUBCIRCUIT_SIZE,
     FULL_CIRCUIT_TASK_RESOURCES,
+    FULL_CIRCUIT_ONLY,
+    CIRCUIT_CUTTING_ONLY,
     CircuitCuttingBuilder
 )
 
@@ -83,6 +85,8 @@ class QuantumSimulation:
             .set_full_circuit_task_resources(
                 self.parameters[FULL_CIRCUIT_TASK_RESOURCES]
             )
+            .set_full_circuit_only(self.parameters[FULL_CIRCUIT_ONLY])
+            .set_circuit_cutting_only(self.parameters[CIRCUIT_CUTTING_ONLY])
             .set_num_samples(self.parameters[NUM_SAMPLES])
             .build(self.executor)
         )
@@ -105,18 +109,22 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
 
-    circuit_sizes = [8, 16, 24]
+    circuit_sizes = [24, 26, 28, 30, 32, 34, 36]
     subcircuit_sizes = {
-        circuit_size: [size for size in range(2, circuit_size // 2 + 1, 2)]
+        circuit_size: [circuit_size // 2 + 1]
         for circuit_size in circuit_sizes
     }
+
+    # subcircuit_sizes = {
+    #     circuit_size: [size for size in range(2, circuit_size // 2 + 1, 2)]
+    #     for circuit_size in circuit_sizes
+    # }
     # subcircuit_sizes = {8: [4]}
 
-    for num_cores_per_node in [256, 128, 64]:
+    for num_cores_per_node in [128]:
         for circuit_size in circuit_sizes:
             for subcircuit_size in subcircuit_sizes[circuit_size]:
-                for num_samples in [10, 100, 1000, 10000]:
-                
+                for num_samples in [100]:
                     try:
                         cluster_info = {
                             "executor": "pilot",
@@ -148,6 +156,8 @@ if __name__ == "__main__":
                                 "num_gpus": 0,
                                 "memory": None,
                             },
+                            FULL_CIRCUIT_ONLY: True,
+                            CIRCUIT_CUTTING_ONLY: False
                             # SIMULATOR_BACKEND_OPTIONS: {"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}}
                         }
 
