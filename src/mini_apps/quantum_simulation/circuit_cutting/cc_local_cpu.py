@@ -38,33 +38,34 @@ if __name__ == "__main__":
     WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
     
     circuit_sizes = [8]    
-    for circuit_size in circuit_sizes:
-        try:
-            cluster_info = {       
-                "executor": "pilot",
-                "config": {
-                    "resource": RESOURCE_URL_HPC,
-                    "working_directory": WORKING_DIRECTORY,
-                    "type": "ray",
-                    "number_of_nodes": 1,
-                    "cores_per_node": 10,
-                    "gpus_per_node": 4,
-                }
+    for circuit_size in circuit_sizes:        
+        cluster_info = {       
+            "executor": "pilot",
+            "config": {
+                "resource": RESOURCE_URL_HPC,
+                "working_directory": WORKING_DIRECTORY,
+                "type": "ray",
+                "number_of_nodes": 1,
+                "cores_per_node": 10,
+                "gpus_per_node": 4,
             }
+        }
 
-            cc_parameters = {
-                SUBCIRCUIT_SIZE : 2,
-                BASE_QUBITS: 7,
-                SCALE_FACTOR : 1,
-                OBSERVABLES: ["ZIIIIII", "IIIZIII", "IIIIIII"], 
-                NUM_SAMPLES: 10,
-                SUB_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None},
-                FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None},
-                # SIMULATOR_BACKEND_OPTIONS: {"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}}
-            }
-            qs = QuantumSimulation(cluster_info, cc_parameters)
-            qs.run()
-            
+        cc_parameters = {
+            SUBCIRCUIT_SIZE : 2,
+            BASE_QUBITS: 7,
+            SCALE_FACTOR : 1,
+            OBSERVABLES: ["ZIIIIII", "IIIZIII", "IIIIIII"], 
+            NUM_SAMPLES: 10,
+            SUB_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None},
+            FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 0, 'memory': None},
+            # SIMULATOR_BACKEND_OPTIONS: {"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}}
+        }
+        qs = QuantumSimulation(cluster_info, cc_parameters)
+        try:            
+            qs.run()            
         except Exception as e:
             print(f"Error: {e}")
             raise e
+        finally:
+            qs.executor.close()
