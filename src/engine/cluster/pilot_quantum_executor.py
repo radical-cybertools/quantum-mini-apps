@@ -39,6 +39,9 @@ class PilotQuantumExecutor(Executor):
         
     def submit_task(self, compute_func, *args, **kwargs):
         return self.pilot.submit_task(compute_func, *args, **kwargs)
+    
+    def submit_mpi_task(self, *args, **kwargs):
+        return self.pilot.submit_mpi_task(*args, **kwargs)    
 
     
     def submit_tasks_dask(self, compute_func, *args,  **kwargs):

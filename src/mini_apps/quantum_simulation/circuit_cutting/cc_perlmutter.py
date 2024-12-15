@@ -33,38 +33,40 @@ if __name__ == "__main__":
     WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
     nodes = [1]    
     for node in nodes:
+        cluster_info = {       
+            "executor": "pilot",
+            "config": {
+                "resource": RESOURCE_URL_HPC,
+                "working_directory": WORKING_DIRECTORY,
+                "type": "ray",
+                "number_of_nodes": node,
+                "cores_per_node": 64,
+                "gpus_per_node": 4,
+                "queue": "premium",
+                "walltime": 30,            
+                "project": "m4408",
+                "scheduler_script_commands": ["#SBATCH --constraint=gpu",
+                                                "#SBATCH --gpus-per-task=1",
+                                                "#SBATCH --ntasks-per-node=4",
+                                                "#SBATCH --gpu-bind=none"],
+            }
+        }
+
+        cc_parameters = {
+            SUBCIRCUIT_SIZE : 2,
+            BASE_QUBITS: 8,
+            SCALE_FACTOR : 4,
+            OBSERVABLES: ["ZIIIIIII", "IIIIZIII", "IIIIIIII"], 
+            SUB_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 1, 'memory': None},
+            FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 64, 'num_gpus': 4, 'memory': None},
+            SIMULATOR_BACKEND_OPTIONS: {"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}}
+        }
+
+        qs = QuantumSimulation(cluster_info, cc_parameters)
         try:
-            cluster_info = {       
-                "executor": "pilot",
-                "config": {
-                    "resource": RESOURCE_URL_HPC,
-                    "working_directory": WORKING_DIRECTORY,
-                    "type": "ray",
-                    "number_of_nodes": node,
-                    "cores_per_node": 64,
-                    "gpus_per_node": 4,
-                    "queue": "premium",
-                    "walltime": 30,            
-                    "project": "m4408",
-                    "scheduler_script_commands": ["#SBATCH --constraint=gpu",
-                                                  "#SBATCH --gpus-per-task=1",
-                                                  "#SBATCH --ntasks-per-node=4",
-                                                  "#SBATCH --gpu-bind=none"],
-                }
-            }
-
-            cc_parameters = {
-                SUBCIRCUIT_SIZE : 2,
-                BASE_QUBITS: 8,
-                SCALE_FACTOR : 4,
-                OBSERVABLES: ["ZIIIIIII", "IIIIZIII", "IIIIIIII"], 
-                SUB_CIRCUIT_TASK_RESOURCES : {'num_cpus': 1, 'num_gpus': 1, 'memory': None},
-                FULL_CIRCUIT_TASK_RESOURCES : {'num_cpus': 64, 'num_gpus': 4, 'memory': None},
-                SIMULATOR_BACKEND_OPTIONS: {"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}}
-            }
-
-            qs = QuantumSimulation(cluster_info, cc_parameters)
             qs.run()
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error: {e}")                
             raise e
+        finally:
+            qs.executor.close()
