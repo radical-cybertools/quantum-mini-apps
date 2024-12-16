@@ -109,9 +109,9 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
 
-    circuit_sizes = [24, 26, 28, 30, 32, 34, 36]
+    circuit_sizes = [33]
     subcircuit_sizes = {
-        circuit_size: [circuit_size // 2 + 1]
+        circuit_size: [circuit_size // 4 + 1]
         for circuit_size in circuit_sizes
     }
 

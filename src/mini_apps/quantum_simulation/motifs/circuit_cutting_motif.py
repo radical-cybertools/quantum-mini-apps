@@ -45,89 +45,94 @@ DEFAULT_SIMULATOR_BACKEND_OPTIONS = {
 
 
 def execute_sampler(backend_options, label, subsystem_subexpts, shots):
-    submit_start = time.time()
-    backend = AerSimulator(**backend_options["backend_options"])
+    # Add error handling
+    try:
+        submit_start = time.time()
+        backend = AerSimulator(**backend_options["backend_options"])
 
-    with Batch(backend=backend) as batch:
-        sampler = SamplerV2(mode=batch)
-        job = sampler.run(subsystem_subexpts, shots=shots)
-        submit_end = time.time()
-        result_start = time.time()
-        result = job.result()
-        result_end = time.time()
+        with Batch(backend=backend) as batch:
+            sampler = SamplerV2(mode=batch)
+            job = sampler.run(subsystem_subexpts, shots=shots)
+            submit_end = time.time()
+            result_start = time.time()
+            result = job.result()
+            result_end = time.time()
 
-        # debug
-        for pub_result in result:
-            # Debugging statements to inspect pub_result
-            print("Attributes of pub_result:", dir(pub_result))
-            print("pub_result:", pub_result)
-            # Break after first iteration for debugging
-            break
+            # debug
+            for pub_result in result:
+                # Debugging statements to inspect pub_result
+                print("Attributes of pub_result:", dir(pub_result))
+                print("pub_result:", pub_result)
+                # Break after first iteration for debugging
+                break
 
-        # Reconstruct the PrimitiveResult object to fix serialization issues with current Qiskit versions (at the time 1.3)
-        # see https://github.com/Qiskit/qiskit/issues/12787
-        from qiskit.primitives.containers import (
-            PrimitiveResult,
-            SamplerPubResult,
-            DataBin,
-            BitArray,
-        )
+            # Reconstruct the PrimitiveResult object to fix serialization issues with current Qiskit versions (at the time 1.3)
+            # see https://github.com/Qiskit/qiskit/issues/12787
+            from qiskit.primitives.containers import (
+                PrimitiveResult,
+                SamplerPubResult,
+                DataBin,
+                BitArray,
+            )
 
-        # Override DataBin class to fix serialization issues
-        class CustomDataBin(DataBin):
-            def __setattr__(self, name, value):
-                super().__init__()
-                self.__dict__[name] = value
+            # Override DataBin class to fix serialization issues
+            class CustomDataBin(DataBin):
+                def __setattr__(self, name, value):
+                    super().__init__()
+                    self.__dict__[name] = value
 
-        # Reconstruct the PrimitiveResult object to fix serialization issues
-        new_results = []
-        for pub_result in result:
-            # Deep copy the metadata
-            new_metadata = copy.deepcopy(pub_result.metadata)
+            # Reconstruct the PrimitiveResult object to fix serialization issues
+            new_results = []
+            for pub_result in result:
+                # Deep copy the metadata
+                new_metadata = copy.deepcopy(pub_result.metadata)
 
-            # Access the DataBin object
-            data_bin = pub_result.data
+                # Access the DataBin object
+                data_bin = pub_result.data
 
-            # Reconstruct DataBin
-            new_data_bin_dict = {}
+                # Reconstruct DataBin
+                new_data_bin_dict = {}
 
-            # Explicitly copy 'observable_measurements'
-            if hasattr(data_bin, "observable_measurements"):
-                observable_measurements = data_bin.observable_measurements
-                new_observable_array = np.copy(observable_measurements.array)
-                new_observable_bitarray = BitArray(
-                    new_observable_array, observable_measurements.num_bits
-                )
-                new_data_bin_dict["observable_measurements"] = new_observable_bitarray
+                # Explicitly copy 'observable_measurements'
+                if hasattr(data_bin, "observable_measurements"):
+                    observable_measurements = data_bin.observable_measurements
+                    new_observable_array = np.copy(observable_measurements.array)
+                    new_observable_bitarray = BitArray(
+                        new_observable_array, observable_measurements.num_bits
+                    )
+                    new_data_bin_dict["observable_measurements"] = new_observable_bitarray
 
-            # Explicitly copy 'qpd_measurements'
-            if hasattr(data_bin, "qpd_measurements"):
-                qpd_measurements = data_bin.qpd_measurements
-                new_qpd_array = np.copy(qpd_measurements.array)
-                new_qpd_bitarray = BitArray(new_qpd_array, qpd_measurements.num_bits)
-                new_data_bin_dict["qpd_measurements"] = new_qpd_bitarray
+                # Explicitly copy 'qpd_measurements'
+                if hasattr(data_bin, "qpd_measurements"):
+                    qpd_measurements = data_bin.qpd_measurements
+                    new_qpd_array = np.copy(qpd_measurements.array)
+                    new_qpd_bitarray = BitArray(new_qpd_array, qpd_measurements.num_bits)
+                    new_data_bin_dict["qpd_measurements"] = new_qpd_bitarray
 
-            # Copy other attributes of DataBin (e.g., 'shape')
-            if hasattr(data_bin, "shape"):
-                new_data_bin_dict["shape"] = copy.deepcopy(data_bin.shape)
+                # Copy other attributes of DataBin (e.g., 'shape')
+                if hasattr(data_bin, "shape"):
+                    new_data_bin_dict["shape"] = copy.deepcopy(data_bin.shape)
 
-            # Create a new DataBin instance
-            new_data_bin = CustomDataBin(**new_data_bin_dict)
-            # new_data_bin.__setattr__ = custom_setattr
+                # Create a new DataBin instance
+                new_data_bin = CustomDataBin(**new_data_bin_dict)
+                # new_data_bin.__setattr__ = custom_setattr
 
-            # Create a new SamplerPubResult
-            new_pub_result = SamplerPubResult(data=new_data_bin, metadata=new_metadata)
-            new_results.append(new_pub_result)
+                # Create a new SamplerPubResult
+                new_pub_result = SamplerPubResult(data=new_data_bin, metadata=new_metadata)
+                new_results.append(new_pub_result)
 
-        # Create a new PrimitiveResult
-        new_result = PrimitiveResult(
-            new_results, metadata=copy.deepcopy(result.metadata)
-        )
+            # Create a new PrimitiveResult
+            new_result = PrimitiveResult(
+                new_results, metadata=copy.deepcopy(result.metadata)
+            )
 
-        print(
-            f"Job {label} completed with job id {job.job_id()}, submit_time: {submit_end-submit_start} and execution_time: {result_end - result_start}, type: {type(new_result)}"
-        )
-        return (label, new_result)
+            print(
+                f"Job {label} completed with job id {job.job_id()}, submit_time: {submit_end-submit_start} and execution_time: {result_end - result_start}, type: {type(new_result)}"
+            )
+            return (label, new_result)
+    except Exception as e:
+        logging.error(f"Error executing sampler: {str(e)}")
+        raise
 
 
 def run_full_circuit(observable, backend_options, full_circuit_transpilation):
@@ -310,8 +315,26 @@ class CircuitCutting(Motif):
 
         self.logger = logger
 
+    def __enter__(self):
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if hasattr(self, 'metrics_file_writer'):
+            self.metrics_file_writer.close()
+
     def pre_processing(self, circuit, observable, num_samples=10):
-       
+        """
+        Preprocess the circuit by finding cuts and generating subexperiments.
+        
+        Args:
+            circuit (QuantumCircuit): The quantum circuit to process
+            observable (SparsePauliOp): The observable to measure
+            num_samples (int): Number of samples to generate
+            
+        Returns:
+            tuple: Contains subexperiments, coefficients, subobservables, 
+                  original observable, and circuit
+        """
         # Specify settings for the cut-finding optimizer
         optimization_settings = OptimizationParameters(seed=111)
 
@@ -510,27 +533,7 @@ class CircuitCutting(Motif):
             self.logger.info(
                 f"Relative error in estimation: {np.real(np.round((final_expval-exact_expval) / exact_expval, 8))}"
             )
-
-        # self.metrics_file_writer.write(
-        #     [
-        #         self.experiment_start_time,
-        #         self.subcircuit_size,
-        #         self.base_qubits,
-        #         self.observables,
-        #         self.scale_factor,
-        #         self.num_samples,
-        #         number_of_tasks,
-        #         str(self.metadata),
-        #         str(self.executor.cluster_config),
-        #         end_find_cuts - start_find_cuts,
-        #         transpile_time_secs,
-        #         subcircuit_exec_time_secs,
-        #         reconstruct_subcircuit_expectations_time_secs,
-        #         total_runtime_secs,
-        #         full_circuit_estimator_runtime,
-        #         float(error_in_estimation),
-        #     ]
-        # )
+        
         self.metrics_file_writer.write(
             [
                 getattr(self, "experiment_start_time", None),
@@ -554,6 +557,7 @@ class CircuitCutting(Motif):
 
         self.metrics_file_writer.close()
 
+
     def _generate_circuit_and_observable(self):
         """
         Generates a quantum circuit and an observable.
@@ -572,6 +576,22 @@ class CircuitCutting(Motif):
         observable = SparsePauliOp([o * self.scale_factor for o in self.observables])
 
         return circuit, observable
+
+    def write_metrics(self, metrics_data):
+        """
+        Safely write metrics data with validation.
+        
+        Args:
+            metrics_data (list): List of metric values to write
+        """
+        # Validate all required metrics are present
+        if len(metrics_data) != len(self.metrics_file_writer.header):
+            raise ValueError("Metrics data length does not match header length")
+        
+        # Convert None values to appropriate format
+        formatted_data = ['' if x is None else x for x in metrics_data]
+        
+        self.metrics_file_writer.write(formatted_data)
 
 
 SUBCIRCUIT_SIZE = "subcircuit_size"
