@@ -7,16 +7,7 @@ from engine.cluster.base_executor import Executor
 from engine.cluster.dask_executor import DaskExecutor   
 
 
-def initialize_client(cluster_config):
-    pilot_compute_description = cluster_config
-    execution_engine = ExecutionEngine(cluster_config["type"])
-    working_directory = cluster_config["working_directory"]
-    
-    pcs = PilotComputeService(execution_engine=execution_engine, working_directory=working_directory)
-    pilot = pcs.create_pilot(pilot_compute_description=pilot_compute_description)
-    pilot.wait()
-    dask_ray_client = pilot.get_client()
-    return pilot, dask_ray_client
+
 
 
 class PilotQuantumExecutor(Executor):
@@ -25,9 +16,24 @@ class PilotQuantumExecutor(Executor):
         super().__init__()
         self.cluster_config = cluster_config or {}
         self.type = self.cluster_config["config"]["type"]
-        self.pilot, self.client = initialize_client(self.cluster_config["config"])
+        self.pilot, self.client = self.initialize_client(self.cluster_config["config"])
+
+    def initialize_client(self, cluster_config):
+        pilot_compute_description = cluster_config
+        execution_engine = ExecutionEngine(cluster_config["type"])
+        working_directory = cluster_config["working_directory"]
+    
+        pcs = PilotComputeService(execution_engine=execution_engine, working_directory=working_directory)
+        pilot = pcs.create_pilot(pilot_compute_description=pilot_compute_description)
+        pilot.wait()
+        dask_ray_client = pilot.get_client()
+        return pilot, dask_ray_client
 
     def close(self):
+        if self.type == "dask":
+            self.client.close()
+        elif self.type == "ray":
+            ray.shutdown()
         self.pilot.cancel()
         
 
