@@ -30,11 +30,7 @@ from engine.metrics.csv_writer import MetricsFileWriter
 from mini_apps.quantum_simulation.motifs.base_motif import Motif
 from mini_apps.quantum_simulation.motifs.qiskit_benchmark import generate_data
 
-from qiskit.primitives import (
-    SamplerResult,  # for SamplerV1
-    PrimitiveResult,  # for SamplerV2
-)
-
+from qiskit.primitives import PrimitiveResult  # for SamplerV2
 from qiskit_aer.primitives import EstimatorV2
 import logging
 
@@ -145,41 +141,72 @@ def run_full_circuit(observable, backend_options, full_circuit_transpilation):
 
 class CircuitCuttingBuilder:
     """
-    A builder class for constructing CircuitCutting objects with various configurations.
-
+    Builder class for configuring and constructing `CircuitCutting` objects with customizable settings.
+    
     Attributes:
-        subcircuit_size (int): The size of the subcircuits.
-        base_qubits (list): The base qubits for the circuit.
-        observables (list): The observables to measure.
-        scale_factor (float): The scale factor for the circuit.
-        qiskit_backend_options (dict): Options for the Qiskit backend.
-        full_circuit_only (bool): Flag to indicate if only the full circuit should be used.
-        circuit_cutting_only (bool): Flag to indicate if only circuit cutting should be used.
-        num_samples (int): The number of samples to use.
-        sub_circuit_task_resources (dict): Resources for sub-circuit tasks.
-        full_circuit_task_resources (dict): Resources for full-circuit tasks.
-        result_file (str): The file to store results.
-
+        subcircuit_size (int): Defines the number of qubits in each subcircuit.
+        base_qubits (list): Specifies the base qubits involved in the circuit.
+        observables (list): Lists the observables to be measured during the simulation.
+        scale_factor (float): Determines the scaling factor applied to the circuit parameters.
+        full_circuit_qiskit_options (dict): Configuration options for the Qiskit backend.
+        circuit_cutting_qiskit_options (dict): Configuration options for the Qiskit backend.
+        full_circuit_only (bool): When set to True, executes only the full circuit without any cutting.
+        circuit_cutting_only (bool): When set to True, enables only circuit cutting without full circuit execution.
+        num_samples (int): Number of samples to be used in the simulation.
+        sub_circuit_task_resources (dict): Specifies computational resources allocated for sub-circuit tasks, such as CPU, GPU, and memory.
+        full_circuit_task_resources (dict): Specifies computational resources allocated for full-circuit tasks, including CPU, GPU, and memory.
+        result_file (str): Path to the file where simulation results will be stored.
+    
     Methods:
-        set_subcircuit_size(subcircuit_size): Sets the size of the subcircuits.
-        set_base_qubits(base_qubits): Sets the base qubits for the circuit.
-        set_observables(observables): Sets the observables to measure.
-        set_scale_factor(scale_factor): Sets the scale factor for the circuit.
-        set_result_file(result_file): Sets the file to store results.
-        set_qiskit_backend_options(qiskit_backend_options): Sets the options for the Qiskit backend.
-        set_num_samples(num_samples): Sets the number of samples to use.
-        set_sub_circuit_task_resources(sub_circuit_task_resources): Sets the resources for sub-circuit tasks.
-        set_full_circuit_task_resources(full_circuit_task_resources): Sets the resources for full-circuit tasks.
-        set_full_circuit_only(full_circuit_only): Sets the flag to indicate if only the full circuit should be used.
-        set_circuit_cutting_only(circuit_cutting_only): Sets the flag to indicate if only circuit cutting should be used.
-        build(executor): Builds and returns a CircuitCutting object with the specified configurations.
+        set_subcircuit_size(subcircuit_size: int) -> CircuitCuttingBuilder:
+            Sets the size of the subcircuits.
+    
+        set_base_qubits(base_qubits: list) -> CircuitCuttingBuilder:
+            Defines the base qubits for the circuit.
+    
+        set_observables(observables: list) -> CircuitCuttingBuilder:
+            Specifies the observables to measure during the simulation.
+    
+        set_scale_factor(scale_factor: float) -> CircuitCuttingBuilder:
+            Sets the scaling factor for circuit parameters.
+    
+        set_result_file(result_file: str) -> CircuitCuttingBuilder:
+            Defines the file path for storing simulation results.
+    
+        set_qiskit_backend_options(qiskit_backend_options: dict) -> CircuitCuttingBuilder:
+            Configures options for the Qiskit backend.
+    
+        set_full_circuit_qiskit_options(full_circuit_qiskit_options: dict) -> CircuitCuttingBuilder:
+            Configures Qiskit backend options specifically for the full circuit simulation.
+    
+        set_circuit_cutting_qiskit_options(circuit_cutting_qiskit_options: dict) -> CircuitCuttingBuilder:
+            Configures Qiskit backend options specifically for circuit cutting simulations.
+    
+        set_num_samples(num_samples: int) -> CircuitCuttingBuilder:
+            Sets the number of samples to be used in the simulation.
+    
+        set_sub_circuit_task_resources(sub_circuit_task_resources: dict) -> CircuitCuttingBuilder:
+            Allocates computational resources for sub-circuit tasks.
+    
+        set_full_circuit_task_resources(full_circuit_task_resources: dict) -> CircuitCuttingBuilder:
+            Allocates computational resources for full-circuit tasks.
+    
+        set_full_circuit_only(full_circuit_only: bool) -> CircuitCuttingBuilder:
+            Enables or disables the execution of only the full circuit.
+    
+        set_circuit_cutting_only(circuit_cutting_only: bool) -> CircuitCuttingBuilder:
+            Enables or disables the use of only circuit cutting.
+    
+        build(executor) -> CircuitCutting:
+            Constructs and returns a `CircuitCutting` object based on the configured settings.
     """
     def __init__(self):
         self.subcircuit_size = None
         self.base_qubits = None
         self.observables = None
         self.scale_factor = None
-        self.qiskit_backend_options = None
+        self.full_circuit_qiskit_options = None
+        self.circuit_cutting_qiskit_options = None
         self.full_circuit_only = False
         self.circuit_cutting_only = False
         self.num_samples = 10
@@ -205,8 +232,12 @@ class CircuitCuttingBuilder:
         self.result_file = result_file
         return self
 
-    def set_qiskit_backend_options(self, qiskit_backend_options):
-        self.qiskit_backend_options = qiskit_backend_options
+    def set_full_circuit_qiskit_options(self, full_circuit_qiskit_options):
+        self.full_circuit_qiskit_options = full_circuit_qiskit_options
+        return self
+
+    def set_circuit_cutting_qiskit_options(self, circuit_cutting_qiskit_options):
+        self.circuit_cutting_qiskit_options = circuit_cutting_qiskit_options
         return self
 
     def set_num_samples(self, num_samples):
@@ -229,6 +260,10 @@ class CircuitCuttingBuilder:
         self.circuit_cutting_only = circuit_cutting_only
         return self
 
+    def set_scenario_label(self, scenario_label):
+        self.scenario_label = scenario_label
+        return self
+
     def build(self, executor):
         return CircuitCutting(
             executor,
@@ -236,13 +271,15 @@ class CircuitCuttingBuilder:
             self.base_qubits,
             self.observables,
             self.scale_factor,
-            self.qiskit_backend_options,
+            self.full_circuit_qiskit_options,
+            self.circuit_cutting_qiskit_options,
             self.sub_circuit_task_resources,
             self.full_circuit_task_resources,
             self.full_circuit_only,
             self.circuit_cutting_only,
             self.result_file,
             self.num_samples,
+            self.scenario_label
         )
 
 
@@ -255,20 +292,23 @@ class CircuitCutting(Motif):
         base_qubits,
         observables,
         scale_factor,
-        qiskit_backend_options,
+        full_circuit_qiskit_options,
+        circuit_cutting_qiskit_options,
         sub_circuit_task_resources,
         full_circuit_task_resources,
         full_circuit_only,
         circuit_cutting_only,
         result_file,
         num_samples,
+        scenario_label
     ):
         super().__init__(executor, base_qubits)
         self.subcircuit_size = subcircuit_size
         self.observables = observables
         self.scale_factor = scale_factor
         self.result_file = result_file
-        self.qiskit_backend_options = qiskit_backend_options
+        self.full_circuit_qiskit_options = full_circuit_qiskit_options
+        self.circuit_cutting_qiskit_options = circuit_cutting_qiskit_options
         self.base_qubits = base_qubits
         self.experiment_start_time = datetime.datetime.now()
         self.num_samples = num_samples
@@ -276,6 +316,7 @@ class CircuitCutting(Motif):
         self.full_circuit_task_resources = full_circuit_task_resources
         self.full_circuit_only = full_circuit_only
         self.circuit_cutting_only = circuit_cutting_only
+        self.scenario_label = scenario_label
         self.metadata = None
         header = [
             "experiment_start_time",
@@ -287,13 +328,17 @@ class CircuitCutting(Motif):
             "number_of_tasks",
             "metadata",
             "cluster_config",
+            "full_circuit_qiskit_options",
+            "circuit_cutting_qiskit_options",
             "find_cuts_time",
             "transpile_time_secs",
             "subcircuit_exec_time_secs",
             "reconstruct_subcircuit_expectations_time_secs",
             "total_runtime_secs",
             "full_circuit_estimator_runtime",
+            "full_circuit_expectation_value",
             "error_in_estimation",
+            "scenario_label"
         ]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
         # Create a logger
@@ -384,11 +429,14 @@ class CircuitCutting(Motif):
         self.logger.info(f"Running Full Circuit Only: {self.full_circuit_only} Circuit Cutting Only: {self.circuit_cutting_only}" )
 
         # Configure backend and transpiler
-        backend_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
-        if self.qiskit_backend_options:
-            backend_options = self.qiskit_backend_options
-        self.logger.info(f"Backend options: {backend_options}")
-        backend = AerSimulator(**backend_options["backend_options"])
+        circuit_cutting_qiskit_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
+        full_circuit_qiskit_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
+        if self.full_circuit_qiskit_options:
+            full_circuit_qiskit_options = self.full_circuit_qiskit_options
+        elif self.circuit_cutting_qiskit_options:
+            circuit_cutting_qiskit_options = self.circuit_cutting_qiskit_options
+        self.logger.info(f"Backend options: {full_circuit_qiskit_options}")
+        backend = AerSimulator(**full_circuit_qiskit_options["backend_options"])
 
         pass_manager = generate_preset_pass_manager(
                 optimization_level=1, backend=backend
@@ -441,7 +489,7 @@ class CircuitCutting(Motif):
                         # parallel version with Ray
                         task_future = self.executor.submit_task(
                             execute_sampler,
-                            backend_options,
+                            circuit_cutting_qiskit_options,
                             label,
                             [ss],
                             resources=resources,
@@ -452,7 +500,7 @@ class CircuitCutting(Motif):
                 else:
                     # sequential version
                     for ss in subsystem_subexpts:
-                        result = execute_sampler(backend_options, label, [ss], shots=2**12)
+                        result = execute_sampler(circuit_cutting_qiskit_options, label, [ss], shots=2**12)
                         print(result)
                         results_tuple.append(result)
                         number_of_tasks = number_of_tasks + 1 
@@ -514,9 +562,9 @@ class CircuitCutting(Motif):
             full_circuit_task = self.executor.submit_task(
                 run_full_circuit,
                 observable,
-                backend_options,
+                full_circuit_qiskit_options,
                 full_circuit_transpilation,
-                resources=self.full_circuit_task_resources,
+                resources=self.full_circuit_task_resources
             )
             exact_expval = self.executor.get_results([full_circuit_task])
             full_circuit_estimator_runtime = time.time() - full_circuit_estimator_time
@@ -545,13 +593,17 @@ class CircuitCutting(Motif):
                 number_of_tasks if 'number_of_tasks' in locals() else None,
                 str(self.metadata) if hasattr(self, "metadata") else None,
                 str(self.executor.cluster_config) if hasattr(self.executor, "cluster_config") else None,
+                str(self.full_circuit_qiskit_options) if hasattr(self, "full_circuit_qiskit_options") else None,
+                str(self.circuit_cutting_qiskit_options) if hasattr(self, "circuit_cutting_qiskit_options") else None,
                 end_find_cuts - start_find_cuts if 'end_find_cuts' in locals() and 'start_find_cuts' in locals() else None,
                 transpile_time_secs if 'transpile_time_secs' in locals() else None,
                 subcircuit_exec_time_secs if 'subcircuit_exec_time_secs' in locals() else None,
                 reconstruct_subcircuit_expectations_time_secs if 'reconstruct_subcircuit_expectations_time_secs' in locals() else None,
                 total_runtime_secs if 'total_runtime_secs' in locals() else None,
                 full_circuit_estimator_runtime if 'full_circuit_estimator_runtime' in locals() else None,
+                exact_expval if 'exact_expval' in locals() else None,
                 float(error_in_estimation) if 'error_in_estimation' in locals() else None,
+                self.scenario_label
             ]
         )
 
@@ -569,13 +621,14 @@ class CircuitCutting(Motif):
         Returns:
             Tuple[QuantumCircuit, SparsePauliOp]: A tuple containing the generated quantum circuit and the observable.
         """
-        # Generate a random circuit
+        # Generate standard circuit comprising of 1 single qubit rotation and 1 entangling  gates between all qubits for each layer
         circuit = EfficientSU2(self.base_qubits * self.scale_factor, entanglement="linear", reps=2).decompose()
         circuit.assign_parameters([0.4] * len(circuit.parameters), inplace=True)
 
         observable = SparsePauliOp([o * self.scale_factor for o in self.observables])
 
         return circuit, observable
+
 
     def write_metrics(self, metrics_data):
         """
@@ -600,7 +653,9 @@ OBSERVABLES = "observables"
 SCALE_FACTOR = "scale_factor"
 SUB_CIRCUIT_TASK_RESOURCES = "sub_circuit_task_resources"
 FULL_CIRCUIT_TASK_RESOURCES = "full_circuit_task_resources"
-SIMULATOR_BACKEND_OPTIONS = "simulator_backend_options"
+CIRCUIT_CUTTING_SIMULATOR_BACKEND_OPTIONS = "circuit_cutting_simulator_backend_options"
+FULL_CIRCUIT_SIMULATOR_BACKEND_OPTIONS = "full_circuit_simulator_backend_options"
 NUM_SAMPLES = "num_samples"
 FULL_CIRCUIT_ONLY = "full_circuit_only"
 CIRCUIT_CUTTING_ONLY = "circuit_cutting_only"
+SCENARIO_LABEL = "scenario_label"
