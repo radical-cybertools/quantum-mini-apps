@@ -88,6 +88,8 @@ class QuantumSimulation:
             )
             .set_full_circuit_only(self.parameters[FULL_CIRCUIT_ONLY])
             .set_circuit_cutting_only(self.parameters[CIRCUIT_CUTTING_ONLY])
+            .set_circuit_cutting_qiskit_options(self.parameters[CIRCUIT_CUTTING_SIMULATOR_BACKEND_OPTIONS])
+            .set_full_circuit_qiskit_options(self.parameters[FULL_CIRCUIT_SIMULATOR_BACKEND_OPTIONS])
             .set_num_samples(self.parameters[NUM_SAMPLES])
             .set_scenario_label(self.parameters[SCENARIO_LABEL])
             .build(self.executor)
@@ -111,7 +113,7 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
 
-    circuit_sizes = [28]
+    circuit_sizes = [24]
     subcircuit_sizes = {
         circuit_size: [circuit_size // 4 + 1]
         for circuit_size in circuit_sizes
@@ -137,7 +139,7 @@ if __name__ == "__main__":
                                     "type": "ray",
                                     "number_of_nodes": 1,
                                     "cores_per_node": num_cores_per_node,
-                                    "gpus_per_node": 0,
+                                    "gpus_per_node": 4,
                                 },
                             }
 
@@ -156,19 +158,24 @@ if __name__ == "__main__":
                                 },
                                 FULL_CIRCUIT_TASK_RESOURCES: {
                                     "num_cpus": 1,
-                                    "num_gpus": 0,
+                                    "num_gpus": 1,
+                                    "num_nodes": 1, # hack not directly supported by Ray - used for srun
                                     "memory": None,
+                                    
                                 },
                                 FULL_CIRCUIT_ONLY: True,
                                 CIRCUIT_CUTTING_ONLY: False,
                                 CIRCUIT_CUTTING_SIMULATOR_BACKEND_OPTIONS: 
                                     {
-                                        "backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}
+                                        "backend_options": {"shots": 1024, "device":"CPU", "method":"statevector"},
+                                        #"backend_options": {"shots": 1024, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25},
+                                        "mpi": False
                                     },
                                 FULL_CIRCUIT_SIMULATOR_BACKEND_OPTIONS: 
                                     {
-                                        "backend_options": {"shots": 4096, "device":"CPU", "method":"statevector", "cuStateVec_enable": True, "max_parallel_experiments": 128, "max_parallel_threads": 128,
-                                        }
+                                        # "backend_options": {"shots": 1024, "device":"CPU", "method":"statevector"},
+                                        "backend_options":  {"device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25},
+                                        "mpi": False
                                         #"backend_options": {"shots": 4096, "device":"GPU", "method":"statevector", "blocking_enable":True, "batched_shots_gpu":True, "blocking_qubits":25}
                                     },
                                 SCENARIO_LABEL: f"circuit_size_{circuit_size}_subcircuit_{subcircuit_size}_samples_{num_samples}_cores_{num_cores_per_node}"

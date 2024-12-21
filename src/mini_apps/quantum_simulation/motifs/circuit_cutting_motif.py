@@ -1,14 +1,24 @@
+# Standard library imports
 import collections
 import copy
 import datetime
+import json
+import logging
 import time
 from time import sleep
 from tracemalloc import start
+import subprocess
 
+# Third party imports
+import fire
 import numpy as np
+
+# Qiskit imports
 from qiskit import transpile
+from qiskit import QuantumCircuit
 from qiskit.circuit.library import EfficientSU2
 from qiskit.circuit.random import random_circuit
+from qiskit.primitives import PrimitiveResult
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_addon_cutting import (
@@ -23,26 +33,52 @@ from qiskit_addon_cutting.automated_cut_finding import (
     OptimizationParameters,
     find_cuts,
 )
-from qiskit_aer import AerSimulator
 from qiskit_ibm_runtime import Batch, SamplerV2
+from qiskit import qpy
 
+# Local imports
 from engine.metrics.csv_writer import MetricsFileWriter
 from mini_apps.quantum_simulation.motifs.base_motif import Motif
 from mini_apps.quantum_simulation.motifs.qiskit_benchmark import generate_data
 
-from qiskit.primitives import PrimitiveResult  # for SamplerV2
-from qiskit_aer.primitives import EstimatorV2
-import logging
 
+# Configuration parameter keys
+# Circuit parameters
+SUBCIRCUIT_SIZE = "subcircuit_size"  # Size of subcircuits after cutting
+BASE_QUBITS = "base_qubits"  # Number of base qubits in circuit
+OBSERVABLES = "observables"  # Observable operators to measure
+SCALE_FACTOR = "scale_factor"  # Scaling factor for circuit size
+NUM_SAMPLES = "num_samples"  # Number of measurement samples
 
+# Resource configuration
+SUB_CIRCUIT_TASK_RESOURCES = "sub_circuit_task_resources"  # Resources for subcircuit tasks
+FULL_CIRCUIT_TASK_RESOURCES = "full_circuit_task_resources"  # Resources for full circuit tasks
+
+# Backend configuration
+CIRCUIT_CUTTING_SIMULATOR_BACKEND_OPTIONS = "circuit_cutting_simulator_backend_options"  # Backend options for cut circuits
+FULL_CIRCUIT_SIMULATOR_BACKEND_OPTIONS = "full_circuit_simulator_backend_options"  # Backend options for full circuit
+
+# Execution mode flags
+FULL_CIRCUIT_ONLY = "full_circuit_only"  # Run only full circuit simulation
+CIRCUIT_CUTTING_ONLY = "circuit_cutting_only"  # Run only circuit cutting simulation
+SCENARIO_LABEL = "scenario_label"  # Label for the simulation scenario
+
+# Default backend configuration
 DEFAULT_SIMULATOR_BACKEND_OPTIONS = {
-    "backend_options": {"device": "CPU", "method": "statevector"}
+    "backend_options": {
+        "device": "CPU",  # Use CPU device
+        "method": "statevector"  # Use statevector simulation method
+    }
 }
 
+##################################################################################################
+# Called from distributed executor, e.g., Ray or MPI
 
+# Circuit Cutting Simulation
 def execute_sampler(backend_options, label, subsystem_subexpts, shots):
     # Add error handling
     try:
+        from qiskit_aer import AerSimulator
         submit_start = time.time()
         backend = AerSimulator(**backend_options["backend_options"])
 
@@ -131,13 +167,77 @@ def execute_sampler(backend_options, label, subsystem_subexpts, shots):
         raise
 
 
-def run_full_circuit(observable, backend_options, full_circuit_transpilation):
-    estimator = EstimatorV2(options=backend_options)
-    exact_expval = (
-        estimator.run([(full_circuit_transpilation, observable)]).result()[0].data.evs
-    )
-    return exact_expval
+# Full Circuit Simulation
+def run_full_circuit(observable, backend_options, full_circuit):
+    try:
+        from qiskit_aer.primitives import EstimatorV2
+        from qiskit_aer import AerSimulator
+        
+        # Create simulator
+        simulator = AerSimulator(**backend_options["backend_options"])
+        
+        # Create estimator using the simulator
+        estimator = EstimatorV2.from_backend(simulator)
+        
+        # Run estimation
+        result = estimator.run([(full_circuit, observable)])
+        exact_expval = result.result()[0].data.evs
+        
+        return exact_expval
+        
+    except Exception as e:
+        logging.error(f"Unexpected error in full circuit simulation: {str(e)}")
+        return str(e)
+        # raise
 
+def load_circuit(circuit_file):
+    """Load circuit from file (qpy)"""
+    with open(circuit_file, 'rb') as fd:
+        circuits = qpy.load(fd)
+    return circuits[0] 
+
+def load_observable(observable_file):
+    """Load observable from npy file"""
+    # Load NumPy file
+    loaded_data = np.load(observable_file, allow_pickle=True)
+    deserialized_observable = SparsePauliOp.from_list(loaded_data.tolist())
+    return deserialized_observable
+    
+
+def cli_run_full_circuit(
+    observable_file: str,
+    backend_options_file: str,
+    circuit_file: str
+    ):
+    """
+    Run full circuit simulation from command line
+    
+    Args:
+        observable_file: Path to npy file containing observable data
+        backend_options_file: Path to JSON file containing backend options
+        circuit_file: Path to qpy file containing quantum circuit
+    
+    Returns:
+        float: Expectation value
+    """
+    # Load inputs from files
+    observable = load_observable(observable_file)
+    with open(backend_options_file, 'r') as f:
+        backend_options = json.load(f)
+    full_circuit = load_circuit(circuit_file)
+    
+    # Import and run the original function
+    from mini_apps.quantum_simulation.motifs.circuit_cutting_motif import run_full_circuit
+    result = run_full_circuit(observable, backend_options, full_circuit)
+    
+    # Convert numpy types to Python native types for JSON serialization
+    if isinstance(result, np.ndarray):
+        result = result.tolist()
+
+    # print(f"{result}")    
+    return result
+
+#####################################################################################################
 
 class CircuitCuttingBuilder:
     """
@@ -211,6 +311,7 @@ class CircuitCuttingBuilder:
         self.circuit_cutting_only = False
         self.num_samples = 10
         self.sub_circuit_task_resources = {"num_cpus": 1, "num_gpus": 0, "memory": None}
+        self.full_circuit_task_resources = {"num_cpus": 1, "num_gpus": 0, "memory": None}
 
     def set_subcircuit_size(self, subcircuit_size):
         self.subcircuit_size = subcircuit_size
@@ -316,6 +417,7 @@ class CircuitCutting(Motif):
         self.full_circuit_task_resources = full_circuit_task_resources
         self.full_circuit_only = full_circuit_only
         self.circuit_cutting_only = circuit_cutting_only
+       
         self.scenario_label = scenario_label
         self.metadata = None
         header = [
@@ -425,156 +527,251 @@ class CircuitCutting(Motif):
 
         return subexperiments, coefficients, subobservables, observable, circuit
 
-    def run(self):
-        self.logger.info(f"Running Full Circuit Only: {self.full_circuit_only} Circuit Cutting Only: {self.circuit_cutting_only}" )
+    def run_circuit_cutting(self, circuit, observable, circuit_cutting_qiskit_options):
+        """
+        Executes the circuit cutting portion of the quantum simulation.
+        
+        Args:
+            circuit (QuantumCircuit): The quantum circuit to be cut and executed
+            observable (SparsePauliOp): The observable to measure
+            pass_manager: The transpiler pass manager
+            
+        Returns:
+            tuple: (final_expval, metrics) containing:
+                - final_expval: The final expectation value
+                - metrics: Dictionary containing timing and execution metrics
+        """
+        from qiskit_aer import AerSimulator
+        backend = AerSimulator(**circuit_cutting_qiskit_options["backend_options"])
 
-        # Configure backend and transpiler
-        circuit_cutting_qiskit_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
-        full_circuit_qiskit_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
-        if self.full_circuit_qiskit_options:
-            full_circuit_qiskit_options = self.full_circuit_qiskit_options
-        elif self.circuit_cutting_qiskit_options:
-            circuit_cutting_qiskit_options = self.circuit_cutting_qiskit_options
-        self.logger.info(f"Backend options: {full_circuit_qiskit_options}")
+        pass_manager = generate_preset_pass_manager(
+                optimization_level=1, backend=backend
+            )
+        # start time
+        start_find_cuts = time.time()
+        subexperiments, coefficients, subobservables, observable, circuit = (
+            self.pre_processing(circuit, observable, self.num_samples)
+        )
+        end_find_cuts = time.time()
+
+        transpile_start_time = time.time()
+        self.logger.info(
+            "*********************************** transpiling circuits ***********************************"
+        )
+        # Transpile the subexperiments to ISA circuits
+        isa_subexperiments = {}
+        for label, partition_subexpts in subexperiments.items():
+            isa_subexperiments[label] = pass_manager.run(partition_subexpts)
+        self.logger.info(
+            "*********************************** transpiling done ***************************************"
+        )
+        transpile_end_time = time.time()
+        transpile_time_secs = transpile_end_time - transpile_start_time
+        self.logger.info(f"Transpile time: {transpile_time_secs}")
+
+        tasks = []
+        sub_circuit_execution_time = time.time()
+        resources = copy.copy(self.sub_circuit_task_resources)
+
+        self.logger.info(
+            f"********************** len of subexperiments {len(isa_subexperiments)}********************"
+        )
+        results_tuple = []
+        use_ray = True
+        number_of_tasks = 0 
+        for label, subsystem_subexpts in isa_subexperiments.items():
+            self.logger.info(
+                f"*************** len of subsystem_subexpts {len(subsystem_subexpts)}**********"
+            )
+            if use_ray:
+                for ss in subsystem_subexpts:
+                    # parallel version with Ray
+                    task_future = self.executor.submit_task(
+                        execute_sampler,
+                        self.circuit_cutting_qiskit_options,
+                        label,
+                        [ss],
+                        resources=resources,
+                        shots=2**12,
+                    )
+                    tasks.append(task_future)
+                    number_of_tasks = number_of_tasks + 1 
+            else:
+                # sequential version
+                for ss in subsystem_subexpts:
+                    result = execute_sampler(self.circuit_cutting_qiskit_options, label, [ss], shots=2**12)
+                    print(result)
+                    results_tuple.append(result)
+                    number_of_tasks = number_of_tasks + 1 
+
+        # temporary fix for the parallel version
+        if use_ray:
+            results_tuple = self.executor.get_results(tasks)
+
+        sub_circuit_execution_end_time = time.time()
+        subcircuit_exec_time_secs = (
+            sub_circuit_execution_end_time - sub_circuit_execution_time
+        )
+        self.logger.info(f"Execution time for subcircuits: {subcircuit_exec_time_secs}")
+        
+        # Get all samplePubResults
+        samplePubResults = collections.defaultdict(list)
+        for result in results_tuple:
+            self.logger.info(f"Result: {result[0], result[1]}")
+            samplePubResults[result[0]].extend(result[1]._pub_results)
+
+        results = {}
+        for label, samples in samplePubResults.items():
+            results[label] = PrimitiveResult(samples)
+
+        reconstruction_start_time = time.time()
+        # Get expectation values for each observable term
+        reconstructed_expvals = reconstruct_expectation_values(
+            results,
+            coefficients,
+            subobservables,
+        )
+        reconstruction_end_time = time.time()
+        reconstruct_subcircuit_expectations_time_secs = (
+            reconstruction_end_time - reconstruction_start_time
+        )
+
+        total_runtime_secs = reconstruction_end_time - start_find_cuts
+
+        self.logger.info(
+            f"Execution time for reconstruction: {reconstruct_subcircuit_expectations_time_secs}"
+        )
+
+        final_expval = np.dot(reconstructed_expvals, observable.coeffs)
+        self.logger.info(f"Reconstructed expectation value: {np.real(np.round(final_expval, 8))}")
+
+        metrics = {
+            'find_cuts_time': end_find_cuts - start_find_cuts,
+            'transpile_time': transpile_time_secs,
+            'subcircuit_exec_time': subcircuit_exec_time_secs,
+            'find_cuts_time': end_find_cuts - start_find_cuts,
+            'reconstruction_time': reconstruct_subcircuit_expectations_time_secs,
+            'total_runtime': total_runtime_secs,
+            'number_of_tasks': number_of_tasks
+        }
+
+        return final_expval, metrics
+
+    def run_full_circuit_simulation(self, circuit, observable, full_circuit_qiskit_options):
+        """
+        Execute the full circuit simulation either via direct execution or MPI.
+        
+        Args:
+            circuit (QuantumCircuit): The quantum circuit to simulate
+            observable (SparsePauliOp): The observable to measure
+            pass_manager: The transpiler pass manager
+            full_circuit_qiskit_options (dict): Backend options for full circuit simulation
+            
+        Returns:
+            tuple: (exact_expval, metrics) containing:
+                - exact_expval (float): The expectation value from full circuit simulation
+                - metrics (dict): Dictionary containing timing metrics
+        """
+        from qiskit_aer import AerSimulator
         backend = AerSimulator(**full_circuit_qiskit_options["backend_options"])
 
         pass_manager = generate_preset_pass_manager(
                 optimization_level=1, backend=backend
             )
+        transpile_start = time.time()
+        full_circuit_transpilation = pass_manager.run(circuit)
+        transpile_end = time.time()
+        transpile_time = transpile_end - transpile_start
+        
+        self.logger.info(f"Execution time for full circuit transpilation: {transpile_time}")
 
-        circuit, observable = self._generate_circuit_and_observable()
-
-        if self.full_circuit_only == False:
-            # start time
-            start_find_cuts = time.time()
-            subexperiments, coefficients, subobservables, observable, circuit = (
-                self.pre_processing(circuit, observable, self.num_samples)
-            )
-            end_find_cuts = time.time()
-
-            transpile_start_time = time.time()
-            self.logger.info(
-                "*********************************** transpiling circuits ***********************************"
-            )
-            # Transpile the subexperiments to ISA circuits
+        # Start timing the full circuit estimation
+        estimator_start = time.time()
+        
+        if "mpi" not in full_circuit_qiskit_options or full_circuit_qiskit_options["mpi"] == False:
+            # Execute the circuit without
+            # exact_expval = run_full_circuit(observable, full_circuit_qiskit_options, full_circuit_transpilation)
             
-            isa_subexperiments = {}
-            for label, partition_subexpts in subexperiments.items():
-                isa_subexperiments[label] = pass_manager.run(partition_subexpts)
-            self.logger.info(
-                "*********************************** transpiling done ***************************************"
-            )
-            transpile_end_time = time.time()
-            transpile_time_secs = transpile_end_time - transpile_start_time
-            self.logger.info(f"Transpile time: {transpile_time_secs}")
+            # Submit task for non-MPI execution directly as a Ray / Dask task
+            ray_task_resources = {k: v for k, v in self.full_circuit_task_resources.items() if k != "num_nodes"}
 
-            tasks = []
-            i = 0
-            sub_circuit_execution_time = time.time()
-            resources = copy.copy(self.sub_circuit_task_resources)
-
-            self.logger.info(
-                f"********************** len of subexperiments {len(isa_subexperiments)}********************"
-            )
-            results_tuple = []
-            use_ray = True
-            number_of_tasks = 0 
-            for label, subsystem_subexpts in isa_subexperiments.items():
-                # self.logger.info(len(subsystem_subexpts))
-                self.logger.info(
-                    f"*************** len of subsystem_subexpts {len(subsystem_subexpts)}**********"
-                )
-                if use_ray:
-                    for ss in subsystem_subexpts:
-                        # parallel version with Ray
-                        task_future = self.executor.submit_task(
-                            execute_sampler,
-                            circuit_cutting_qiskit_options,
-                            label,
-                            [ss],
-                            resources=resources,
-                            shots=2**12,
-                        )
-                        tasks.append(task_future)
-                        number_of_tasks = number_of_tasks + 1 
-                else:
-                    # sequential version
-                    for ss in subsystem_subexpts:
-                        result = execute_sampler(circuit_cutting_qiskit_options, label, [ss], shots=2**12)
-                        print(result)
-                        results_tuple.append(result)
-                        number_of_tasks = number_of_tasks + 1 
-
-                i = i + 1
-
-            # temporary fix for the parallel version
-            if use_ray:
-                results_tuple = self.executor.get_results(tasks)
-
-            sub_circuit_execution_end_time = time.time()
-            subcircuit_exec_time_secs = (
-                sub_circuit_execution_end_time - sub_circuit_execution_time
-            )
-            self.logger.info(f"Execution time for subcircuits: {subcircuit_exec_time_secs}")
-            print(str(results_tuple))
-            # Get all samplePubResults
-            samplePubResults = collections.defaultdict(list)
-            for result in results_tuple:
-                print(result)
-                self.logger.info(f"Result: {result[0], result[1]}")
-                samplePubResults[result[0]].extend(result[1]._pub_results)
-
-            results = {}
-            for label, samples in samplePubResults.items():
-                results[label] = PrimitiveResult(samples)
-
-            reconstruction_start_time = time.time()
-            # Get expectation values for each observable term
-            reconstructed_expvals = reconstruct_expectation_values(
-                results,
-                coefficients,
-                subobservables,
-            )
-            reconstruction_end_time = time.time()
-            reconstruct_subcircuit_expectations_time_secs = (
-                reconstruction_end_time - reconstruction_start_time
-            )
-
-            total_runtime_secs = reconstruction_end_time - start_find_cuts
-
-            self.logger.info(
-                f"Execution time for reconstruction: {reconstruct_subcircuit_expectations_time_secs}"
-            )
-
-            final_expval = np.dot(reconstructed_expvals, observable.coeffs)
-            self.logger.info(f"Reconstructed expectation value: {np.real(np.round(final_expval, 8))}")
-
-        if self.circuit_cutting_only == False:
-            exact_expval = 0
-            transpile_full_circuit_time = time.time()
-            full_circuit_transpilation = pass_manager.run(circuit)
-            transpile_full_circuit_end_time = time.time()
-            self.logger.info(
-                f"Execution time for full Circuit transpilation: {transpile_full_circuit_end_time-transpile_full_circuit_time}"
-            )
-
-            full_circuit_estimator_time = time.time()
             full_circuit_task = self.executor.submit_task(
                 run_full_circuit,
                 observable,
                 full_circuit_qiskit_options,
                 full_circuit_transpilation,
-                resources=self.full_circuit_task_resources
+                resources=ray_task_resources
             )
             exact_expval = self.executor.get_results([full_circuit_task])
-            full_circuit_estimator_runtime = time.time() - full_circuit_estimator_time
+        else:
+            # Submit task for MPI parallel execution via command line
+            with open("full_circuit.qpy", "wb") as f:
+                qpy.dump(full_circuit_transpilation, f)
 
-            self.logger.info(
-                f"Execution time for full circuit: {full_circuit_estimator_runtime}"
-            )
+            np.save("observable.npy", observable.to_list())
+            
+            with open("backend_options.json", "w") as f:
+                json.dump(full_circuit_qiskit_options, f)
 
-            self.logger.info(f"Exact expectation value: {np.round(exact_expval, 8)}")
+            num_nodes = self.full_circuit_task_resources.get("num_nodes", 1)  # Default to 1 if not specified
+          
 
+            cmd = ["srun", "-N", str(num_nodes), 
+                   f"--ntasks-per-node={self.full_circuit_task_resources['num_gpus']}", "--gpus-per-task=1" , "python", "-m", 
+                   "mini_apps.quantum_simulation.motifs.circuit_cutting_motif",
+                   "observable.npy", "backend_options.json", "full_circuit.qpy"]
+            
+            self.logger.info(f"Running command: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            exact_expval = float(result.stdout.strip())
+
+        estimator_time = time.time() - estimator_start
+        
+        self.logger.info(f"Execution time for full circuit: {estimator_time}")
+        self.logger.info(f"Exact expectation value: {np.round(exact_expval, 8)}")
+        
+        return exact_expval, {
+            'transpile_time': transpile_time,
+            'estimator_time': estimator_time,
+            'total_time': transpile_time + estimator_time
+        }
+
+    def run(self):
+        
+        self.logger.info(f"Running Full Circuit Only: {self.full_circuit_only} Circuit Cutting Only: {self.circuit_cutting_only}" )
+
+        # Configure backend and transpiler
+        circuit_cutting_qiskit_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
+        full_circuit_qiskit_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
+        
+        if self.full_circuit_qiskit_options is not None:
+            full_circuit_qiskit_options = self.full_circuit_qiskit_options
+        
+        if self.circuit_cutting_qiskit_options is not None:
+            circuit_cutting_qiskit_options = self.circuit_cutting_qiskit_options
+        
+        self.logger.info(f"Circuit Cutting Backend options: {circuit_cutting_qiskit_options}")
+        self.logger.info(f"Full Circuit Backend options: {full_circuit_qiskit_options}")
+        
+        circuit, observable = self._generate_circuit_and_observable()
+
+        if self.full_circuit_only == False: # Run circuit cutting experiments
+            final_expval, metrics = self.run_circuit_cutting(circuit, observable, circuit_cutting_qiskit_options)
+            
+            # Store metrics for later use
+            end_find_cuts = metrics['find_cuts_time']
+            transpile_time_secs = metrics['transpile_time']
+            subcircuit_exec_time_secs = metrics['subcircuit_exec_time']
+            find_cuts_time_secs = metrics['find_cuts_time']
+            reconstruct_subcircuit_expectations_time_secs = metrics['reconstruction_time']
+            total_runtime_secs = metrics['total_runtime']
+            number_of_tasks = metrics['number_of_tasks']
+
+        if self.circuit_cutting_only == False: # Run full circuit simulation
+            exact_expval, metrics = self.run_full_circuit_simulation(circuit, observable, full_circuit_qiskit_options)
+
+
+        # Calculate error in estimation between circuit cutting and full circuit simulation
         if self.full_circuit_only == False and self.circuit_cutting_only == False:
             error_in_estimation = np.real(np.round(final_expval - exact_expval, 8))
             self.logger.info(f"Error in estimation: {error_in_estimation}")
@@ -582,6 +779,7 @@ class CircuitCutting(Motif):
                 f"Relative error in estimation: {np.real(np.round((final_expval-exact_expval) / exact_expval, 8))}"
             )
         
+        # Write metrics to file
         self.metrics_file_writer.write(
             [
                 getattr(self, "experiment_start_time", None),
@@ -595,12 +793,12 @@ class CircuitCutting(Motif):
                 str(self.executor.cluster_config) if hasattr(self.executor, "cluster_config") else None,
                 str(self.full_circuit_qiskit_options) if hasattr(self, "full_circuit_qiskit_options") else None,
                 str(self.circuit_cutting_qiskit_options) if hasattr(self, "circuit_cutting_qiskit_options") else None,
-                end_find_cuts - start_find_cuts if 'end_find_cuts' in locals() and 'start_find_cuts' in locals() else None,
+                find_cuts_time_secs if 'find_cuts_time_secs' in locals() else None,
                 transpile_time_secs if 'transpile_time_secs' in locals() else None,
                 subcircuit_exec_time_secs if 'subcircuit_exec_time_secs' in locals() else None,
                 reconstruct_subcircuit_expectations_time_secs if 'reconstruct_subcircuit_expectations_time_secs' in locals() else None,
                 total_runtime_secs if 'total_runtime_secs' in locals() else None,
-                full_circuit_estimator_runtime if 'full_circuit_estimator_runtime' in locals() else None,
+                metrics['estimator_time'] if 'estimator_time' in locals() else None,
                 exact_expval if 'exact_expval' in locals() else None,
                 float(error_in_estimation) if 'error_in_estimation' in locals() else None,
                 self.scenario_label
@@ -647,15 +845,12 @@ class CircuitCutting(Motif):
         self.metrics_file_writer.write(formatted_data)
 
 
-SUBCIRCUIT_SIZE = "subcircuit_size"
-BASE_QUBITS = "base_qubits"
-OBSERVABLES = "observables"
-SCALE_FACTOR = "scale_factor"
-SUB_CIRCUIT_TASK_RESOURCES = "sub_circuit_task_resources"
-FULL_CIRCUIT_TASK_RESOURCES = "full_circuit_task_resources"
-CIRCUIT_CUTTING_SIMULATOR_BACKEND_OPTIONS = "circuit_cutting_simulator_backend_options"
-FULL_CIRCUIT_SIMULATOR_BACKEND_OPTIONS = "full_circuit_simulator_backend_options"
-NUM_SAMPLES = "num_samples"
-FULL_CIRCUIT_ONLY = "full_circuit_only"
-CIRCUIT_CUTTING_ONLY = "circuit_cutting_only"
-SCENARIO_LABEL = "scenario_label"
+
+
+
+if __name__ == '__main__':
+    """
+    Run the full circuit simulation from the command line 
+    Used for testing the full circuit simulation with distributed state vector simulation based on MPI
+    """
+    fire.Fire(cli_run_full_circuit)
