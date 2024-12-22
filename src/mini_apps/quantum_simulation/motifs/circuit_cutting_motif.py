@@ -8,6 +8,7 @@ import time
 from time import sleep
 from tracemalloc import start
 import subprocess
+import os
 
 # Third party imports
 import fire
@@ -202,7 +203,6 @@ def load_observable(observable_file):
     loaded_data = np.load(observable_file, allow_pickle=True)
     deserialized_observable = SparsePauliOp.from_list(loaded_data.tolist())
     return deserialized_observable
-    
 
 def cli_run_full_circuit(
     observable_file: str,
@@ -236,6 +236,8 @@ def cli_run_full_circuit(
 
     # print(f"{result}")    
     return result
+
+
 
 #####################################################################################################
 
@@ -432,13 +434,16 @@ class CircuitCutting(Motif):
             "cluster_config",
             "full_circuit_qiskit_options",
             "circuit_cutting_qiskit_options",
+            "full_circuit_task_resources",
+            "sub_circuit_task_resources",
             "find_cuts_time",
-            "transpile_time_secs",
-            "subcircuit_exec_time_secs",
-            "reconstruct_subcircuit_expectations_time_secs",
-            "total_runtime_secs",
-            "full_circuit_estimator_runtime",
-            "full_circuit_expectation_value",
+            "circuit_cutting_transpile_time_secs",
+            "circuit_cutting_exec_time_secs",
+            "circuit_cutting_reconstruct_time_secs",
+            "circuit_cutting_total_runtime_secs",
+            "full_circuit_transpile_time_secs",
+            "full_circuit_exec_time_secs",
+            "full_circuit_total_runtime_secs",
             "error_in_estimation",
             "scenario_label"
         ]
@@ -687,13 +692,16 @@ class CircuitCutting(Motif):
 
         # Start timing the full circuit estimation
         estimator_start = time.time()
+
+        # num_nodes attribute in task resource description in Ray
+        ray_task_resources = {k: v for k, v in self.full_circuit_task_resources.items() if k != "num_nodes"}
         
         if "mpi" not in full_circuit_qiskit_options or full_circuit_qiskit_options["mpi"] == False:
             # Execute the circuit without
             # exact_expval = run_full_circuit(observable, full_circuit_qiskit_options, full_circuit_transpilation)
             
             # Submit task for non-MPI execution directly as a Ray / Dask task
-            ray_task_resources = {k: v for k, v in self.full_circuit_task_resources.items() if k != "num_nodes"}
+           
 
             full_circuit_task = self.executor.submit_task(
                 run_full_circuit,
@@ -704,26 +712,60 @@ class CircuitCutting(Motif):
             )
             exact_expval = self.executor.get_results([full_circuit_task])
         else:
-            # Submit task for MPI parallel execution via command line
-            with open("full_circuit.qpy", "wb") as f:
+            
+            # Serialize the circuit and observable to files
+            # Get working directory from executor or use current directory as fallback
+            working_dir = self.executor.cluster_config["config"]["working_directory"]
+            
+            # Create full paths using working directory
+            hash_id = hex(hash(str(time.time())))[-5:]
+            circuit_file = os.path.join(working_dir, f"full_circuit_{hash_id}.qpy")
+            observable_file = os.path.join(working_dir, f"observable_{hash_id}.npy")
+            backend_file = os.path.join(working_dir, f"backend_options_{hash_id}.json")
+
+            # Write files to working directory
+            with open(circuit_file, "wb") as f:
                 qpy.dump(full_circuit_transpilation, f)
 
-            np.save("observable.npy", observable.to_list())
+            np.save(observable_file, observable.to_list())
             
-            with open("backend_options.json", "w") as f:
+            with open(backend_file, "w") as f:
                 json.dump(full_circuit_qiskit_options, f)
 
             num_nodes = self.full_circuit_task_resources.get("num_nodes", 1)  # Default to 1 if not specified
           
+            # Submit task for MPI parallel execution via command line
 
             cmd = ["srun", "-N", str(num_nodes), 
                    f"--ntasks-per-node={self.full_circuit_task_resources['num_gpus']}", "--gpus-per-task=1" , "python", "-m", 
                    "mini_apps.quantum_simulation.motifs.circuit_cutting_motif",
-                   "observable.npy", "backend_options.json", "full_circuit.qpy"]
+                   observable_file, backend_file, circuit_file]
             
             self.logger.info(f"Running command: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            exact_expval = float(result.stdout.strip())
+            task = self.executor.submit_task(
+                subprocess.run,
+                cmd,
+                capture_output=True,
+                text=True,
+                resources=ray_task_resources
+            )
+            result = self.executor.get_results([task])[0]
+        
+            if result.returncode != 0:
+                raise RuntimeError(f"Command failed with error: {result.stderr}")
+                       
+            # Log the number of output lines
+            output_lines = result.stdout.strip().split('\n')
+            self.logger.info(f"Number of output lines: {len(output_lines)}")
+       
+            
+            # result = subprocess.run(cmd, capture_output=True, text=True)
+            exact_expval = float(output_lines[0])
+
+            # delete the files
+            os.remove(circuit_file)
+            os.remove(observable_file)
+            os.remove(backend_file)
 
         estimator_time = time.time() - estimator_start
         
@@ -738,7 +780,7 @@ class CircuitCutting(Motif):
 
     def run(self):
         
-        self.logger.info(f"Running Full Circuit Only: {self.full_circuit_only} Circuit Cutting Only: {self.circuit_cutting_only}" )
+        self.logger.info(f"Circuit Size: {self.base_qubits} Running Full Circuit Only: {self.full_circuit_only} Circuit Cutting Only: {self.circuit_cutting_only}" )
 
         # Configure backend and transpiler
         circuit_cutting_qiskit_options = DEFAULT_SIMULATOR_BACKEND_OPTIONS
@@ -759,16 +801,20 @@ class CircuitCutting(Motif):
             final_expval, metrics = self.run_circuit_cutting(circuit, observable, circuit_cutting_qiskit_options)
             
             # Store metrics for later use
-            end_find_cuts = metrics['find_cuts_time']
-            transpile_time_secs = metrics['transpile_time']
-            subcircuit_exec_time_secs = metrics['subcircuit_exec_time']
-            find_cuts_time_secs = metrics['find_cuts_time']
-            reconstruct_subcircuit_expectations_time_secs = metrics['reconstruction_time']
-            total_runtime_secs = metrics['total_runtime']
+            circuit_cutting_transpile_time_secs = metrics['transpile_time']
+            circuit_cutting_exec_time_secs = metrics['subcircuit_exec_time']
+            circuit_cutting_find_cuts_time_secs = metrics['find_cuts_time']
+            circuit_cutting_reconstruct_subcircuit_expectations_time_secs = metrics['reconstruction_time']
+            circuit_cutting_total_runtime_secs = metrics['total_runtime']
             number_of_tasks = metrics['number_of_tasks']
 
         if self.circuit_cutting_only == False: # Run full circuit simulation
-            exact_expval, metrics = self.run_full_circuit_simulation(circuit, observable, full_circuit_qiskit_options)
+            exact_expval, full_metrics = self.run_full_circuit_simulation(circuit, observable, full_circuit_qiskit_options)
+
+            # Store full circuit metrics analogously
+            full_circuit_transpile_time_secs = full_metrics['transpile_time']
+            full_circuit_exec_time_sec = full_metrics['estimator_time']
+            full_circuit_total_runtime_secs = full_metrics['total_time']
 
 
         # Calculate error in estimation between circuit cutting and full circuit simulation
@@ -793,12 +839,17 @@ class CircuitCutting(Motif):
                 str(self.executor.cluster_config) if hasattr(self.executor, "cluster_config") else None,
                 str(self.full_circuit_qiskit_options) if hasattr(self, "full_circuit_qiskit_options") else None,
                 str(self.circuit_cutting_qiskit_options) if hasattr(self, "circuit_cutting_qiskit_options") else None,
-                find_cuts_time_secs if 'find_cuts_time_secs' in locals() else None,
-                transpile_time_secs if 'transpile_time_secs' in locals() else None,
-                subcircuit_exec_time_secs if 'subcircuit_exec_time_secs' in locals() else None,
-                reconstruct_subcircuit_expectations_time_secs if 'reconstruct_subcircuit_expectations_time_secs' in locals() else None,
-                total_runtime_secs if 'total_runtime_secs' in locals() else None,
-                metrics['estimator_time'] if 'estimator_time' in locals() else None,
+                str(self.sub_circuit_task_resources) if hasattr(self, "sub_circuit_task_resources") else None,
+                str(self.full_circuit_task_resources) if hasattr(self, "full_circuit_task_resources") else None,
+                circuit_cutting_find_cuts_time_secs if 'circuit_cutting_find_cuts_time_secs' in locals() else None,
+                circuit_cutting_transpile_time_secs if 'circuit_cutting_transpile_time_secs' in locals() else None,
+                circuit_cutting_exec_time_secs if 'circuit_cutting_exec_time_secs' in locals() else None,
+                circuit_cutting_reconstruct_subcircuit_expectations_time_secs if 'circuit_cutting_reconstruct_subcircuit_expectations_time_secs' in 
+                locals() else None,                
+                circuit_cutting_total_runtime_secs if 'circuit_cutting_total_runtime_secs' in locals() else None,
+                full_circuit_transpile_time_secs if 'full_circuit_transpile_time_secs' in locals() else None,
+                full_circuit_exec_time_sec if 'full_circuit_exec_time_sec' in locals() else None,
+                full_circuit_total_runtime_secs if 'full_circuit_total_runtime_secs' in locals() else None,
                 exact_expval if 'exact_expval' in locals() else None,
                 float(error_in_estimation) if 'error_in_estimation' in locals() else None,
                 self.scenario_label
