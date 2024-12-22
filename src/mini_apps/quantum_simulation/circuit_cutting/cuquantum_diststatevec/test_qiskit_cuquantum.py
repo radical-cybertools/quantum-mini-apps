@@ -1,4 +1,12 @@
+"""
+Only works with Ququantum Appliance
+"""
+
 import os
+import sys
+sys.path.insert(0, "/opt/udiImage/modules/mpich")
+sys.path.insert(0, "/opt/udiImage/modules/gpu/lib64")
+print(str(sys.path))
 
 # os.environ["LD_LIBRARY_PATH"] = "/opt/conda/envs/cuquantum-24.08/lib"
 # os.system("printenv LD_LIBRARY_PATH")
@@ -7,7 +15,7 @@ from qiskit import QuantumCircuit, transpile
 from qiskit_aer import Aer
 from cuquantum import contract
 import numpy as np
-# from mpi4py import MPI
+from mpi4py import MPI
 import cusvaer
 
 

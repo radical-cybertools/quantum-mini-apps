@@ -108,19 +108,19 @@ class QuantumSimulation:
 
 # Define benchmark configurations at the top
 BENCHMARK_CONFIG = {
-    'num_runs': 3,
+    'num_runs': 1,
     'hardware_configs': [
         {
-            'nodes': 1,
+            'nodes': [1,2,4,8,16],
             'cores_per_node': 128,
-            'gpus_per_node': [1, 2, 4]
+            'gpus_per_node': [4]
         }
     ],
     'circuit_configs': [
         {
-            'qubit_sizes': [33],
-            'subcircuit_sizes': [8],  # 30//4 + 1
-            'num_samples': 100
+            'qubit_sizes': [34],
+            'subcircuit_sizes': [17, 12, 8],  # 30//4 + 1
+            'num_samples': 1000
         }
     ]
 }
@@ -138,7 +138,7 @@ def create_cluster_info(nodes, cores, gpus):
         },
     }
 
-def create_cluster_info_perlmutter(nodes, cores, gpus):
+def create_cluster_info_perlmutter(nodes, cores=128, gpus=4):
     return {       
         "executor": "pilot",
         "config": {
@@ -146,19 +146,20 @@ def create_cluster_info_perlmutter(nodes, cores, gpus):
             "working_directory": WORKING_DIRECTORY,
             "type": "ray",
             "number_of_nodes": nodes,
-                "cores_per_node": 64,
-                "gpus_per_node": 4,
-                "queue": "premium",
-                "walltime": 120,            
-                "project": "m4408",
-                "scheduler_script_commands": ["#SBATCH --constraint=gpu&hbm80g",
-                                                "#SBATCH --gpus-per-task=1",
-                                                "#SBATCH --ntasks-per-node=4",
-                                                "#SBATCH --gpu-bind=none"],
+            "cores_per_node": cores,
+            "gpus_per_node": gpus,
+            "queue": "premium",
+            #"queue": "regular",
+            "walltime": 30,            
+            "project": "m4408",
+            "scheduler_script_commands": ["#SBATCH --constraint=gpu&hbm80g",
+                                            "#SBATCH --gpus-per-task=1",
+                                            f"#SBATCH --ntasks-per-node={gpus}",
+                                            "#SBATCH --gpu-bind=none"],
             }
         }
 
-def create_cc_parameters(circuit_size, subcircuit_size, num_samples, num_cores, num_gpus):
+def create_cc_parameters(circuit_size, subcircuit_size, num_samples, num_nodes, num_cores, num_gpus):
     return {
         SUBCIRCUIT_SIZE: subcircuit_size,
         BASE_QUBITS: circuit_size,
@@ -167,23 +168,27 @@ def create_cc_parameters(circuit_size, subcircuit_size, num_samples, num_cores, 
         NUM_SAMPLES: num_samples,
         SUB_CIRCUIT_TASK_RESOURCES: {
             "num_cpus": 1,
-            "num_gpus": 0,
+            "num_gpus": 1,
             "memory": None,
         },
         FULL_CIRCUIT_TASK_RESOURCES: {
             "num_cpus": 1,
             "num_gpus": num_gpus,
-            "num_nodes": 1,
+            "num_nodes": num_nodes,
             "memory": None,
         },
-        FULL_CIRCUIT_ONLY: True,
+        FULL_CIRCUIT_ONLY: False,
         CIRCUIT_CUTTING_ONLY: False,
         CIRCUIT_CUTTING_SIMULATOR_BACKEND_OPTIONS: {
-            "backend_options": {"shots": 1024, "device":"CPU", "method":"statevector"},
+            #"backend_options": {"shots": 4096, "device":"CPU", "method":"statevector"},
+            "backend_options": {"device":"GPU", "method":"statevector", "shots": 4096,
+                              "blocking_enable":True, "batched_shots_gpu":True, 
+                              "blocking_qubits":23},
             "mpi": False
         },
         FULL_CIRCUIT_SIMULATOR_BACKEND_OPTIONS: {
-            "backend_options": {"device":"GPU", "method":"statevector", 
+            #"backend_options": {"shots": 4096, "device":"CPU", "method":"statevector"},
+            "backend_options": {"device":"GPU", "method":"statevector", "shots": 4096,
                               "blocking_enable":True, "batched_shots_gpu":True, 
                               "blocking_qubits":23},
             "mpi": True
@@ -196,33 +201,35 @@ def run_mini_app_benchmark():
         logger.info(f"Starting benchmark run {run_idx + 1}/{BENCHMARK_CONFIG['num_runs']}")
         
         for hw_config in BENCHMARK_CONFIG['hardware_configs']:
-            for gpus in hw_config['gpus_per_node']:
-                cluster_info = create_cluster_info_perlmutter(
-                    hw_config['nodes'], 
-                    hw_config['cores_per_node'], 
-                    gpus
-                )
-                
-                for circuit_config in BENCHMARK_CONFIG['circuit_configs']:
-                    for qubit_size in circuit_config['qubit_sizes']:
-                        for subcircuit_size in circuit_config['subcircuit_sizes']:
-                            try:
-                                cc_parameters = create_cc_parameters(
-                                    qubit_size,
-                                    subcircuit_size,
-                                    circuit_config['num_samples'],
-                                    hw_config['cores_per_node'],
-                                    gpus
-                                )
-                                
-                                logger.info(f"Running configuration: {cc_parameters[SCENARIO_LABEL]}")
-                                qs = QuantumSimulation(cluster_info, cc_parameters)
-                                qs.run()
-                                qs.close()
-                                
-                            except Exception as e:
-                                logger.error(f"Error in configuration {cc_parameters[SCENARIO_LABEL]}: {e}")
-                                raise e
+            for nodes in hw_config['nodes']:
+                for gpus in hw_config['gpus_per_node']:
+                    cluster_info = create_cluster_info_perlmutter(
+                        nodes=nodes,
+                        cores=hw_config['cores_per_node'],
+                        gpus=gpus
+                    )
+                    
+                    for circuit_config in BENCHMARK_CONFIG['circuit_configs']:
+                        for qubit_size in circuit_config['qubit_sizes']:
+                            for subcircuit_size in circuit_config['subcircuit_sizes']:
+                                try:
+                                    cc_parameters = create_cc_parameters(
+                                        circuit_size=qubit_size,
+                                        subcircuit_size=subcircuit_size,
+                                        num_samples=circuit_config['num_samples'],
+                                        num_nodes=nodes,
+                                        num_cores=hw_config['cores_per_node'],
+                                        num_gpus=gpus
+                                    )
+                                    
+                                    logger.info(f"Running configuration: {cc_parameters[SCENARIO_LABEL]}")
+                                    qs = QuantumSimulation(cluster_info, cc_parameters)
+                                    qs.run()
+                                    qs.close()
+                                    
+                                except Exception as e:
+                                    logger.error(f"Error in configuration {cc_parameters[SCENARIO_LABEL]}: {e}")
+                                    raise e
 
 if __name__ == "__main__":
     RESOURCE_URL_HPC = "slurm://localhost"
