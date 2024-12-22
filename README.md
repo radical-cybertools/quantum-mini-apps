@@ -47,14 +47,6 @@ This will execute the `QuantumSimulation` Mini-App with the default configuratio
 To run on Perlmutter, follow [Using Dask on Perlmutter](https://gitlab.com/NERSC/nersc-notebooks/-/tree/main/perlmutter/dask#using-dask-on-perlmutter) to provision dask cluster, and run ```python mini-apps/quantum-simulation/ce_perlmutter.py``` against the running Perlmutter dask cluster.
 
 
-## Motifs
-
-Currently the following Motifs were implemented
-
-[**Circuit Execution**](docs/CircuitExecution.md)
-[**Circuit Cutting**](docs/CircuitCutting.md)
-[**State Vector Mini-Apps**](docs/StateVector.md)
-
 ## Extending the Mini-App framework
 Contributions to the Quantum Mini-Apps framework are welcome! If you encounter any issues or have suggestions for improvements, please open an issue or submit a pull request.
 
@@ -67,11 +59,12 @@ The following Mini-Apps are currently implemented
 ### Quantum Simulation
 The Quantum Simulation mini-app implements following motifs
 
-[**Circuit Execution**](CircuitExecution.md) 
+[**Circuit Execution**](docs/CircuitExecution.md)
 
-[**Circuit Cutting**](CircuitCutting.md)
+[**Circuit Cutting**](docs/CircuitCutting.md)
 
-[**State Vector**](StateVector.md)
+[**State Vector Mini-Apps**](docs/StateVector.md)
+
 
 ### QML Data Compression & Training
 
