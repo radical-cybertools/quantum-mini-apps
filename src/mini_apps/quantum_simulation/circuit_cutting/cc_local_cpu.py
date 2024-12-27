@@ -29,6 +29,24 @@ from mini_apps.quantum_simulation.motifs.circuit_cutting_motif import (
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# Define benchmark configurations at the top
+BENCHMARK_CONFIG = {
+    'num_runs': 3,
+    'hardware_configs': [
+        {
+            'nodes': [1],
+            'cores_per_node': 1,
+            'gpus_per_node': [1]
+        }
+    ],
+    'circuit_configs': [
+        {
+            'qubit_sizes': [34],
+            'subcircuit_sizes': [17, 12],  # 30//4 + 1
+            'num_samples': 1000
+        }
+    ]
+}
 
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -106,24 +124,7 @@ class QuantumSimulation:
         stop_ray()
 
 
-# Define benchmark configurations at the top
-BENCHMARK_CONFIG = {
-    'num_runs': 1,
-    'hardware_configs': [
-        {
-            'nodes': [1,2,4,8,16],
-            'cores_per_node': 128,
-            'gpus_per_node': [4]
-        }
-    ],
-    'circuit_configs': [
-        {
-            'qubit_sizes': [34],
-            'subcircuit_sizes': [17, 12, 8],  # 30//4 + 1
-            'num_samples': 1000
-        }
-    ]
-}
+
 
 def create_cluster_info(nodes, cores, gpus):
     return {
@@ -178,7 +179,7 @@ def create_cc_parameters(circuit_size, subcircuit_size, num_samples, num_nodes, 
             "memory": None,
         },
         FULL_CIRCUIT_ONLY: False,
-        CIRCUIT_CUTTING_ONLY: False,
+        CIRCUIT_CUTTING_ONLY: True,
         CIRCUIT_CUTTING_SIMULATOR_BACKEND_OPTIONS: {
             #"backend_options": {"shots": 4096, "device":"CPU", "method":"statevector"},
             "backend_options": {"device":"GPU", "method":"statevector", "shots": 4096,
