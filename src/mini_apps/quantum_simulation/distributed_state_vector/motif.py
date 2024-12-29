@@ -84,10 +84,10 @@ class DistStateVector(Motif):
             #working_dir = self.executor.cluster_config["config"]["working_directory"]
             
             num_nodes = self.executor.cluster_config.get("config", {}).get("number_of_nodes", 1)
-            num_gpus = self.executor.cluster_config.get("config", {}).get("gpus_per_node", 0)
-        
+            num_gpus_per_node = self.executor.cluster_config.get("config", {}).get("gpus_per_node", 0)
+            num_gpus = num_nodes * num_gpus_per_node
+    
             # Submit task for MPI parallel execution via command line
-
             cmd = ["srun", "-N", str(num_nodes), 
                    f"-n {num_gpus}", "python",  
                    sys.modules[self.__class__.__module__].__file__]
@@ -122,8 +122,13 @@ class DistStateVector(Motif):
         
         else:
             # Run directly in process if MPI is not enabled
-            self.logger.info(f"Running simulation in_process with parameters: {self.parameters}")
-            self.run_simulation(self.parameters)
+            try:
+                self.logger.info(f"Running simulation in_process with parameters: {self.parameters}")
+                self.run_simulation(self.parameters)
+            except Exception as e:
+                self.logger.error(f"Simulation failed with error: {str(e)}")
+                self.logger.exception("Full traceback:")
+                raise RuntimeError(f"Simulation failed: {str(e)}") from e
 
     @staticmethod
     def run_simulation(parameters):

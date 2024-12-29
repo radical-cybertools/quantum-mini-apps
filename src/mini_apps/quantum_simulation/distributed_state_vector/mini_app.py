@@ -30,8 +30,8 @@ BENCHMARK_CONFIG = {
     ],
     'circuit_configs': [
         {
-            'qubit_sizes': [32, 33, 34, 35, 36, 37, 38, 39, 40],
-            'enable_jacobian': [True, False],
+            'qubit_sizes': [31, 32, 33, 34, 35, 36, 37, 38, 39, 40],
+            'enable_jacobian': [True],
         }
     ]
 }
