@@ -12,7 +12,7 @@ from qiskit_ionq import IonQProvider
 
 
 from engine.metrics.csv_writer import MetricsFileWriter
-from mini_apps.quantum_simulation.motifs.base_motif import Motif
+from engine.base.base_motif import Motif
 from mini_apps.quantum_simulation.motifs.qiskit_benchmark import generate_data
 import datetime
 # from qiskit_rigetti import RigettiQCSProvider
