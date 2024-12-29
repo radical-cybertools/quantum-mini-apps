@@ -1,0 +1,12 @@
+{
+    "num_runs": 2,
+    "n_wires": 26,
+    "n_layers": 2,
+    "diff_method": "adjoint",
+    "pennylane_device_config": {
+        "name": "lightning.gpu",
+        "wires": 26,
+        "mpi": "True",
+        "batch_obs": "True"
+    }
+}
