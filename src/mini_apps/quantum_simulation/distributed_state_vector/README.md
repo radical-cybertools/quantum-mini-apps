@@ -1,5 +1,7 @@
 # Pennylane Lightning.GPU from Source on Perlmutter
 
+## Installation
+
 * Source:
     * https://pennylane.ai/blog/2023/09/distributing-quantum-simulations-using-lightning-gpu-with-NVIDIA-cuQuantum
     * https://github.com/PennyLaneAI/pennylane-lightning
@@ -50,7 +52,23 @@
 
     ```
 
+## Mini-App Usage
 
+
+
+* Test MPI Run of Motif
+
+```
+salloc --account xxx --nodes 2 --qos interactive  --time 04:00:00 --constraint gpu --gpus 8
+```
+
+```
+srun -N 2 -n 8 python motif.py --num-runs 1 --n-wires 31 --n-layers 2 --enable-jacobian False --diff-method adjoint --device lightning.gpu --mpi True
+
+```
+
+
+## Miscellaneous
 
 * Other maybe useful commands to try:
 

@@ -17,6 +17,7 @@ class MetricsFileWriter:
 
     def write(self, metrics):
         self.writer.writerow(metrics)
+        self.fh.flush()
 
     def close(self):
         self.fh.close()

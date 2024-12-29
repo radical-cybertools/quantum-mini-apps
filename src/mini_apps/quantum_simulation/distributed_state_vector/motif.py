@@ -161,10 +161,16 @@ class DistStateVector(Motif):
         dev = qml.device(**pennylane_device_config)
 
         # Create QNode of device and circuit
-        @qml.qnode(dev, interface="autograd", diff_method=diff_method)
         def circuit_adj(weights):
             qml.StronglyEntanglingLayers(weights, wires=list(range(n_wires)))
             return qml.math.hstack([qml.expval(qml.PauliZ(i)) for i in range(n_wires)])
+
+        if enable_jacobian:
+            print(f"Initializing QNode with jacobian enabled: interface=autograd, diff_method={diff_method}")
+            circuit_adj = qml.qnode(dev, interface="autograd", diff_method=diff_method)(circuit_adj)
+        else:
+            print("Initializing QNode without jacobian")
+            circuit_adj = qml.qnode(dev)(circuit_adj)
 
         # Set trainable parameters for calculating circuit Jacobian at the rank=0 process
         if rank == 0:
@@ -179,10 +185,12 @@ class DistStateVector(Motif):
         if rank == 0:
             timestamp = time.strftime("%Y%m%d-%H%M%S")
             metrics_writer = MetricsFileWriter(f"distributed_state_vector_{timestamp}.csv", header=[
+                "timestamp",
                 "num_gpus",
                 "wires",
                 "layers", 
-                "time"
+                "time",
+                "enable_jacobian"
             ])
         timing = []
         for t in range(num_runs):
@@ -196,14 +204,17 @@ class DistStateVector(Motif):
             end = time.time()
             timing.append(end - start)
             if rank == 0:
+                current_timestamp = time.strftime("%Y%m%d-%H%M%S")
                 metrics = [
+                    current_timestamp,
                     size,
                     n_wires,
                     n_layers,
-                    qml.numpy.mean(timing)
+                    qml.numpy.mean(timing),
+                    enable_jacobian
                 ]
                 metrics_writer.write(metrics)
-                print("num_gpus: ", size, " wires: ", n_wires, " layers ", n_layers, " time: ", qml.numpy.mean(timing))
+                print("timestamp: ", current_timestamp, " num_gpus: ", size, " wires: ", n_wires, " layers ", n_layers, " time: ", qml.numpy.mean(timing))
         
         if rank == 0:
             metrics_writer.close()
@@ -232,7 +243,7 @@ if __name__ == "__main__":
                       help='Number of wires (default: 10)')
     parser.add_argument('--n-layers', type=int, default=2,
                       help='Number of layers (default: 2)')
-    parser.add_argument('--diff-method', type=str, default='adjoint',
+    parser.add_argument('--diff-method', type=str, default='None',
                       choices=['adjoint', 'parameter-shift', 'None'],
                       help='Differentiation method (default: adjoint)')
     parser.add_argument('--device', type=str, default='lightning.qpu',
@@ -243,6 +254,9 @@ if __name__ == "__main__":
     parser.add_argument('--enable-jacobian', type=str, default='False',
                       choices=['True', 'False'],
                       help='Enable Jacobian calculation (default: False)')
+    parser.add_argument('--batch-obs', type=str, default='False',
+                      choices=['True', 'False'],
+                      help='Enable batch observations (default: False)')
     
     args = parser.parse_args()
 
@@ -261,7 +275,7 @@ if __name__ == "__main__":
             "pennylane_device_config": {
                 "name": args.device,
                 "mpi": args.mpi,
-                "batch_obs": True
+                "batch_obs": args.batch_obs.lower() == 'true'  # Convert string to boolean
             }
         }
         dist_state_vector = DistStateVector(None, parameters)
