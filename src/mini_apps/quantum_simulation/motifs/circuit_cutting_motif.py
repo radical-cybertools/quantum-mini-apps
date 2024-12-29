@@ -637,7 +637,6 @@ class CircuitCutting(Motif):
                     active_tasks.remove(task_ref)
 
             # if use_ray:
-            # if use_ray:
             #     for ss in subsystem_subexpts:
 
             #         # if self.sub_circuit_task_resources["num_gpus"] > 0:                      
