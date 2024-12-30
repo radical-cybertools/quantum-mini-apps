@@ -29,7 +29,7 @@ BENCHMARK_CONFIG = {
     'num_runs': 3,
     'hardware_configs': [
         {
-            'nodes': [2],
+            'nodes': [16],
             'cores_per_node': 128,
             'gpus_per_node': [4]
         }
@@ -37,7 +37,7 @@ BENCHMARK_CONFIG = {
     'circuit_configs': [
         {
             'qubit_sizes': [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42],
-            'enable_jacobian': [False],
+            'enable_jacobian': [False, True],
         }
     ]
 }
@@ -48,7 +48,7 @@ def create_cluster_info_perlmutter(nodes, cores=128, gpus=4):
         "executor": "pilot",
         "config": {
             "resource": RESOURCE_URL_HPC,
-            "working_directory": os.getcwd(),
+            "working_directory": WORKING_DIRECTORY,
             "type": "ray",
             "number_of_nodes": nodes,
             "cores_per_node": cores,
