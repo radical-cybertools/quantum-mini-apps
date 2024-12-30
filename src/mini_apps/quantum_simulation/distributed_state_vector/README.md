@@ -126,8 +126,8 @@ The quantum circuit implements a Strongly Entangling Layer pattern:
     CMAKE_ARGS="-DENABLE_MPI=ON" python -m pip install -e . --config-settings editable_mode=compat -vv
     ```
 
+    ```
     CMAKE_ARGS="-DENABLE_MPI=ON -DCMAKE_C_COMPILER=/opt/cray/pe/craype/2.7.30/bin/cc -DCMAKE_CXX_COMPILER=/opt/cray/pe/craype/2.7.30/bin/CC" python -m pip install -e . --config-settings editable_mode=compat -vv
-
     ```
 
 ## Pennylane

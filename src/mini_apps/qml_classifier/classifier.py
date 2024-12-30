@@ -6,7 +6,7 @@ from engine.metrics.csv_writer import MetricsFileWriter
 from engine.manager import MiniAppExecutor
 
 from time import perf_counter
-from mini_apps.classifier.utils.training import training
+from mini_apps.qml_classifier.utils.training import training
 
 class QMLClassifierMiniApp:
     def __init__(self, pilot_compute_description):
