@@ -11,7 +11,7 @@
     
     ```
     module load conda python
-    module load PrgEnv-gnu mpich cudatoolkit craype-accel-nvidia80
+    module load PrgEnv-gnu mpich cudatoolkit craype-accel-nvidia80 cudnn/8.3.2
     ```
 
 * Compiler Commands:
@@ -51,6 +51,10 @@
     CMAKE_ARGS="-DENABLE_MPI=ON -DCMAKE_C_COMPILER=/opt/cray/pe/craype/2.7.30/bin/cc -DCMAKE_CXX_COMPILER=/opt/cray/pe/craype/2.7.30/bin/CC" python -m pip install -e . --config-settings editable_mode=compat -vv
 
     ```
+
+## Pennylane
+
+* Qjit has jax as dependency...
 
 ## Mini-App Usage
 

@@ -12,6 +12,9 @@ import logging
 
 # Third party imports
 import pennylane as qml
+
+# import jax.numpy as jnp
+from pennylane import qjit 
 from mpi4py import MPI
 from pennylane import numpy as np
 
@@ -143,6 +146,7 @@ class DistStateVector(Motif):
         pennylane_device_config["wires"] = n_wires
         diff_method = parameters["diff_method"]
         enable_jacobian = parameters.get("enable_jacobian", False)
+        enable_qjit = parameters.get("enable_qjit", False)
         if diff_method == "None":
             diff_method = None
         if pennylane_device_config["mpi"].lower() == "true":
@@ -163,14 +167,23 @@ class DistStateVector(Motif):
         # Create QNode of device and circuit
         def circuit_adj(weights):
             qml.StronglyEntanglingLayers(weights, wires=list(range(n_wires)))
-            return qml.math.hstack([qml.expval(qml.PauliZ(i)) for i in range(n_wires)])
+            return [qml.expval(qml.PauliZ(i)) for i in range(n_wires)]
+            #return qml.expval(qml.PauliZ(0))
+
+        params = np.array(
+            np.random.random(qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=n_wires)), 
+            dtype=np.float64
+        )
 
         if enable_jacobian:
             print(f"Initializing QNode with jacobian enabled: interface=autograd, diff_method={diff_method}")
             circuit_adj = qml.qnode(dev, interface="autograd", diff_method=diff_method)(circuit_adj)
         else:
             print("Initializing QNode without jacobian")
-            circuit_adj = qml.qnode(dev)(circuit_adj)
+            circuit_adj = qml.qnode(dev, diff_method=None)(circuit_adj)
+        
+        if enable_qjit:
+            circuit_adj = qjit(circuit_adj)
 
         # Set trainable parameters for calculating circuit Jacobian at the rank=0 process
         if rank == 0:
@@ -183,15 +196,29 @@ class DistStateVector(Motif):
 
         # Create MetricsWriter instance if rank 0
         if rank == 0:
+            # Create results directory if it doesn't exist
+            results_dir = os.path.abspath("results")
+            if not os.path.exists(results_dir):
+                os.makedirs(results_dir)
+            print(f"Results directory: {results_dir}")
+
+            # Create a timestamp and initialize the MetricsFileWriter with the path to the results directory
             timestamp = time.strftime("%Y%m%d-%H%M%S")
-            metrics_writer = MetricsFileWriter(f"distributed_state_vector_{timestamp}.csv", header=[
-                "timestamp",
-                "num_gpus",
-                "wires",
-                "layers", 
-                "time",
-                "enable_jacobian"
-            ])
+            metrics_writer = MetricsFileWriter(
+                os.path.join(results_dir, f"distributed_state_vector_{timestamp}.csv"),
+                header=[
+                    "timestamp",
+                    "num_gpus",
+                    "wires",
+                    "layers", 
+                    "time",
+                    "expval",
+                    "enable_jacobian",
+                    "enable_qjit",
+                    "num_runs",
+                    "stddev"
+                ]
+            )
         timing = []
         for t in range(num_runs):
             start = time.time()            
@@ -211,10 +238,17 @@ class DistStateVector(Motif):
                     n_wires,
                     n_layers,
                     qml.numpy.mean(timing),
-                    enable_jacobian
+                    str(result[0]),
+                    enable_jacobian,
+                    enable_qjit,
+                    num_runs,
+                    qml.numpy.std(timing)
                 ]
                 metrics_writer.write(metrics)
-                print("timestamp: ", current_timestamp, " num_gpus: ", size, " wires: ", n_wires, " layers ", n_layers, " time: ", qml.numpy.mean(timing))
+                print("timestamp: ", current_timestamp, " num_gpus: ", size, " wires: ", n_wires, 
+                      " layers ", n_layers, " time: ", qml.numpy.mean(timing), " result q0: ", result[0],
+                      " enable_qjit: ", enable_qjit, " mpi: ", pennylane_device_config["mpi"],
+                      " num_runs: ", num_runs, " stddev: ", qml.numpy.std(timing))
         
         if rank == 0:
             metrics_writer.close()
@@ -246,8 +280,8 @@ if __name__ == "__main__":
     parser.add_argument('--diff-method', type=str, default='None',
                       choices=['adjoint', 'parameter-shift', 'None'],
                       help='Differentiation method (default: adjoint)')
-    parser.add_argument('--device', type=str, default='lightning.qpu',
-                      help='PennyLane device name (default: lightning.qpu)')
+    parser.add_argument('--device', type=str, default='lightning.gpu',
+                      help='PennyLane device name (default: lightning.gpu)')
     parser.add_argument('--mpi', type=str, default='True',
                       choices=['True', 'False'],
                       help='Enable MPI (default: True)')
@@ -257,6 +291,9 @@ if __name__ == "__main__":
     parser.add_argument('--batch-obs', type=str, default='False',
                       choices=['True', 'False'],
                       help='Enable batch observations (default: False)')
+    parser.add_argument('--enable-qjit', type=str, default='False',
+                      choices=['True', 'False'],
+                      help='Enable QJIT compilation (default: True)')
     
     args = parser.parse_args()
 
@@ -271,11 +308,12 @@ if __name__ == "__main__":
             "n_wires": args.n_wires,
             "n_layers": args.n_layers,
             "diff_method": args.diff_method,
-            "enable_jacobian": args.enable_jacobian.lower() == 'true',  # Convert string to boolean
+            "enable_jacobian": args.enable_jacobian.lower() == 'true',
+            "enable_qjit": args.enable_qjit.lower() == 'true',
             "pennylane_device_config": {
                 "name": args.device,
                 "mpi": args.mpi,
-                "batch_obs": args.batch_obs.lower() == 'true'  # Convert string to boolean
+                "batch_obs": args.batch_obs.lower() == 'true'
             }
         }
         dist_state_vector = DistStateVector(None, parameters)
