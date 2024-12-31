@@ -177,7 +177,7 @@ class DistStateVector(Motif):
         # Create QNode of device and circuit
         def circuit_adj(weights):
             qml.StronglyEntanglingLayers(weights, wires=list(range(n_wires)))
-            return [qml.expval(qml.PauliZ(i)) for i in range(n_wires)]
+            return qml.math.hstack([qml.expval(qml.PauliZ(i)) for i in range(n_wires)])
             #return qml.expval(qml.PauliZ(0))
 
         params = np.array(
@@ -212,10 +212,9 @@ class DistStateVector(Motif):
                 os.makedirs(results_dir)
             print(f"Results directory: {results_dir}")
 
-            # Create a timestamp and initialize the MetricsFileWriter with the path to the results directory
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            # Create a timestamp and initialize the MetricsFileWriter with the path to the results directory            
             metrics_writer = MetricsFileWriter(
-                os.path.join(results_dir, f"distributed_state_vector_{timestamp}.csv"),
+                os.path.join(results_dir, f"distributed_state_vector_{start_time_agent_str}.csv"),
                 header=[
                     "timestamp",
                     "num_gpus",
@@ -241,10 +240,9 @@ class DistStateVector(Motif):
             runtime = end - start
             timing.append(runtime)
             
-            if rank == 0:
-                current_timestamp = time.strftime("%Y%m%d-%H%M%S")
+            if rank == 0:                
                 metrics = [
-                    current_timestamp,
+                    start_time_agent_str,
                     size,
                     n_wires,
                     n_layers,
@@ -255,7 +253,7 @@ class DistStateVector(Motif):
                     mpi_startup_time
                 ]
                 metrics_writer.write(metrics)
-                print("timestamp: ", current_timestamp, " num_gpus: ", size, " wires: ", n_wires, 
+                print("timestamp: ", start_time_agent_str, " num_gpus: ", size, " wires: ", n_wires, 
                       " layers ", n_layers, " time: ", runtime, " result q0: ", result[0],
                       " enable_qjit: ", enable_qjit, " mpi: ", pennylane_device_config["mpi"],
                       " mpi_startup_time: ", mpi_startup_time

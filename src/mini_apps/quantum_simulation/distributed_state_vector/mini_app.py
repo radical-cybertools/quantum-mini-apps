@@ -29,14 +29,14 @@ BENCHMARK_CONFIG = {
     'num_runs': 3,
     'hardware_configs': [
         {
-            'nodes': [1],
+            'nodes': [64],
             'cores_per_node': 128,
             'gpus_per_node': [4]
         }
     ],
     'circuit_configs': [
         {
-            'qubit_sizes': [26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42],
+            'qubit_sizes': [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41],
             'enable_jacobian': [False, True],
         }
     ]
