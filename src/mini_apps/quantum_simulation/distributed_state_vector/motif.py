@@ -9,6 +9,7 @@ import sys
 import time
 from timeit import default_timer as timer
 import logging
+from datetime import datetime
 
 # Third party imports
 import pennylane as qml
@@ -78,6 +79,9 @@ class DistStateVector(Motif):
         # Check if MPI is enabled in the device config
         mpi_enabled = self.parameters.get("pennylane_device_config", {}).get("mpi", "").lower() == "true"
         
+        # set startup for external tasks to later measure the overhead
+        self.parameters["agent_timestamp"] = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
         num_nodes = 1
         num_gpus = 0
         if mpi_enabled and self.executor is not None:
@@ -95,7 +99,7 @@ class DistStateVector(Motif):
                    f"-n {num_gpus}", "python",  
                    sys.modules[self.__class__.__module__].__file__]
 
-                        # Add parameters as command line arguments
+            # Add parameters as command line arguments
             if isinstance(self.parameters, dict):
                 for key, value in self.parameters.items():
                     if key == "pennylane_device_config":
@@ -153,6 +157,12 @@ class DistStateVector(Motif):
             pennylane_device_config["mpi"] = True
         else:
             pennylane_device_config["mpi"] = False
+        
+        # for computation of task startup overhead
+        start_time_agent_str = parameters.get("agent_timestamp", datetime.now().strftime("%Y%m%d_%H%M%S"))
+        start_time_agent = datetime.strptime(start_time_agent_str, "%Y%m%d_%H%M%S").timestamp()        
+        start_time_process = time.time()
+        mpi_startup_time = start_time_process - start_time_agent
 
         # Instantiate CPU (lightning.qubit) or GPU (lightning.gpu) device
         # mpi=True to switch on distributed simulation
@@ -215,8 +225,7 @@ class DistStateVector(Motif):
                     "expval",
                     "enable_jacobian",
                     "enable_qjit",
-                    "num_runs",
-                    "stddev"
+                    "mpi_startup_time"
                 ]
             )
         timing = []
@@ -229,7 +238,9 @@ class DistStateVector(Motif):
                 print("Calculating State Vector without Jacobian")
                 result = circuit_adj(params)
             end = time.time()
-            timing.append(end - start)
+            runtime = end - start
+            timing.append(runtime)
+            
             if rank == 0:
                 current_timestamp = time.strftime("%Y%m%d-%H%M%S")
                 metrics = [
@@ -237,18 +248,18 @@ class DistStateVector(Motif):
                     size,
                     n_wires,
                     n_layers,
-                    qml.numpy.mean(timing),
+                    runtime,
                     str(result[0]),
                     enable_jacobian,
                     enable_qjit,
-                    num_runs,
-                    qml.numpy.std(timing)
+                    mpi_startup_time
                 ]
                 metrics_writer.write(metrics)
                 print("timestamp: ", current_timestamp, " num_gpus: ", size, " wires: ", n_wires, 
-                      " layers ", n_layers, " time: ", qml.numpy.mean(timing), " result q0: ", result[0],
+                      " layers ", n_layers, " time: ", runtime, " result q0: ", result[0],
                       " enable_qjit: ", enable_qjit, " mpi: ", pennylane_device_config["mpi"],
-                      " num_runs: ", num_runs, " stddev: ", qml.numpy.std(timing))
+                      " mpi_startup_time: ", mpi_startup_time
+                      )
         
         if rank == 0:
             metrics_writer.close()
@@ -294,6 +305,9 @@ if __name__ == "__main__":
     parser.add_argument('--enable-qjit', type=str, default='False',
                       choices=['True', 'False'],
                       help='Enable QJIT compilation (default: True)')
+    parser.add_argument('--agent-timestamp', type=str, 
+                  default=datetime.now().strftime("%Y%m%d_%H%M%S"),
+                  help='Timestamp for logging (default: current time in format YYYYMMDD_HHMMSS)')
     
     args = parser.parse_args()
 
@@ -310,6 +324,7 @@ if __name__ == "__main__":
             "diff_method": args.diff_method,
             "enable_jacobian": args.enable_jacobian.lower() == 'true',
             "enable_qjit": args.enable_qjit.lower() == 'true',
+            "agent_timestamp": args.agent_timestamp,
             "pennylane_device_config": {
                 "name": args.device,
                 "mpi": args.mpi,
