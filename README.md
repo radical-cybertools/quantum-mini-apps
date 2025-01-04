@@ -17,7 +17,7 @@ The main components of the framework are:
 Architecture
 ----
 
-[mini-app-arch](https://github.com/radical-cybertools/quantum-mini-apps/files/14898257/mini-app-arch.1.pdf)
+![Mini App Architecture diagram](https://github.com/radical-cybertools/quantum-mini-apps/blob/main/mini-app-arch.pdf)
 
 
 ## Getting Started
@@ -59,14 +59,28 @@ The following Mini-Apps are currently implemented
 ### Quantum Simulation
 The Quantum Simulation mini-app implements following motifs
 
-[**Circuit Execution**](docs/CircuitExecution.md) 
+[**Circuit Execution**](src/mini_apps/quantum_simulation/circuit_execution/README.md)
 
 [**Circuit Cutting**](src/mini_apps/quantum_simulation/circuit_cutting/README.md)
 
-[**Distributed State Vector**](src/mini_apps/quantum_simulation/distributed_state_vector/README.md)
+[**State Vector Mini-Apps**](src/mini_apps/quantum_simulation/distributed_state_vector/README.md)
+
 
 ### QML Data Compression & Training
 
+[**QML Classifier**](src/mini_apps/qml_classifier/README.md)
+
+[**QML Data Compression**](src/mini_apps/qml_data_compression/README.md)
+
+[**QML Training**](src/mini_apps/qml_training/README.md)
+
+
+## References
+- Pilot-Quantum: [https://github.com/radical-cybertools/pilot-quantum](https://github.com/radical-cybertools/pilot-quantum)
+- QuGEN Framework: [https://github.com/QutacQuantum/qugen](https://github.com/QutacQuantum/qugen)
+- Saurabh, N., et al. "Quantum Mini-Apps: A Framework for Benchmarking Quantum Computing Systems" [arXiv:2412.18519](https://arxiv.org/abs/2412.18519)
+- Saurabh, N., et al. "Pilot-Quantum: A Runtime System for Quantum Computing Applications" [arXiv:2405.07333](https://arxiv.org/abs/2405.07333)
+- Saurabh, N., et al. "Quantum Computing Mini-Applications: Characterizing Quantum Computing Execution Models" [arXiv:2308.06608](https://arxiv.org/abs/2308.06608)
 
 
 
