@@ -4,3 +4,5 @@
 .venv/
 **/*.npy
 **/*.csv
+.vscode/
+slurm_output

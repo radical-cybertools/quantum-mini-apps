@@ -17,8 +17,7 @@ The main components of the framework are:
 Architecture
 ----
 
-![Mini App Architecture diagram](https://github.com/radical-cybertools/quantum-mini-apps/blob/main/mini-app-arch.pdf)
-
+<img src="https://github.com/radical-cybertools/quantum-mini-apps/blob/934ddc3e3dd3f4fafe9e8a1e1558e2c3cd446e4a/docs/mini-app-arch.png" alt="Mini App Architecture diagram" width="400" style="display: block; margin: auto;">
 
 ## Getting Started
 
@@ -29,14 +28,19 @@ To get started with the Quantum Mini-Apps framework, follow these steps:
 git clone https://github.com/radical-cybertools/quantum-mini-apps.git
 ```
 
-2. Install the required dependencies:
+2. Install the required dependencies and framework defined in ```pyproject.toml``` in Conda/Python env:
 ```
 cd quantum-mini-apps
-pip install -r requirements.txt
-export PYTHONPATH=$PWD/src:$PYTHONPATH ### Add this statement to shell startup script (like .bashrc)
+pip install --update .
 ```
 
-3. Run the provided example Mini-App:
+3. Set PYTHONPATH for easier debugging:
+
+```
+export PYTHONPATH=$PWD/src:$PYTHONPATH # Add this statement to shell startup script (like .bashrc)
+```
+
+4. Run an Mini-App:
 
 ```commandline
 python src/mini_apps/quantum_simulation/circuit_execution/ce_local.py
@@ -44,29 +48,37 @@ python src/mini_apps/quantum_simulation/circuit_execution/ce_local.py
 
 This will execute the `QuantumSimulation` Mini-App with the default configuration, which runs a circuit execution motif on a local Dask cluster.
 
-To run on Perlmutter, follow [Using Dask on Perlmutter](https://gitlab.com/NERSC/nersc-notebooks/-/tree/main/perlmutter/dask#using-dask-on-perlmutter) to provision dask cluster, and run ```python mini-apps/quantum-simulation/ce_perlmutter.py``` against the running Perlmutter dask cluster.
-
-
 ## Extending the Mini-App framework
-Contributions to the Quantum Mini-Apps framework are welcome! If you encounter any issues or have suggestions for improvements, please open an issue or submit a pull request.
-
-To customize the framework or develop your own Mini-Apps/Motifs, you can extend the base Motif class which provides executor as an abstraction for executing the mini-apps. 
-
+Contributions to the Quantum Mini-Apps framework are welcome! If you encounter any issues or have suggestions for improvements, please open an issue or submit a pull request. 
 
 ## Mini Apps
-The following Mini-Apps are currently implemented
+Each Mini-App provides an in-depth documentation. The following Mini-Apps are currently implemented:
 
 ### Quantum Simulation
-The Quantum Simulation mini-app implements following motifs
 
-[**Circuit Execution**](docs/CircuitExecution.md)
+[**Circuit Execution**](src/mini_apps/quantum_simulation/circuit_execution/README.md)
 
-[**Circuit Cutting**](docs/CircuitCutting.md)
+[**Circuit Cutting**](src/mini_apps/quantum_simulation/circuit_cutting/README.md)
 
-[**State Vector Mini-Apps**](docs/StateVector.md)
+[**State Vector Mini-Apps**](src/mini_apps/quantum_simulation/distributed_state_vector/README.md)
 
 
-### QML Data Compression & Training
+### Quantum Machine Learning 
+
+[**QML Classifier**](src/mini_apps/qml_classifier/README.md)
+
+[**QML Compression**](src/mini_apps/qml_compression/README.md)
+
+[**QML Training**](src/mini_apps/qml_training/README.md)
+
+
+## References
+- Pilot-Quantum: [https://github.com/radical-cybertools/pilot-quantum](https://github.com/radical-cybertools/pilot-quantum)
+- QuGEN Framework: [https://github.com/QutacQuantum/qugen](https://github.com/QutacQuantum/qugen)
+- Saurabh, N., et al. "Quantum Mini-Apps: A Framework for Developing and Benchmarking Quantum-HPC Applications" [arXiv:2412.18519](https://arxiv.org/abs/2412.18519)
+- Saurabh, N., et al. "Pilot-Quantum: A Quantum-HPC Middleware for Resource, Workload and Task Management" [arXiv:2405.07333](https://arxiv.org/abs/2405.07333)
+- Saurabh, N., et al. "A Conceptual Architecture for a Quantum-HPC Middleware" [arXiv:2308.06608](https://arxiv.org/abs/2308.06608)
+
 
 
 ## License
@@ -74,7 +86,4 @@ The Quantum Simulation mini-app implements following motifs
 This project is licensed under the [MIT License](LICENSE).
 
 
-## Resources
-
-[Using Dask on Perlmutter](https://gitlab.com/NERSC/nersc-notebooks/-/tree/main/perlmutter/dask#using-dask-on-perlmutter)
 

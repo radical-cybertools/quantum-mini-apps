@@ -1,2 +1,0 @@
-num_qubits,n_entries,circuit_depth,size_of_observable,depth_of_recursion,compute_time_ms
-10,10,1,1,1,0.16138076782226562

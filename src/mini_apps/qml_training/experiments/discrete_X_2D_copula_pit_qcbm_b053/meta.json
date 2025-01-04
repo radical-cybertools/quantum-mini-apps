@@ -1,1 +1,0 @@
-{"model_name": "discrete_X_2D_copula_pit_qcbm_b053", "data_set ": "X_2D", "n_qubits": 8, "n_registers": 2, "circuit_type": "copula", "circuit_depth": 2, "transformation": "pit", "hot_start_path": "", "training_data": {"0": {"batch_size": 200, "n_epochs": 500, "sigma": 0.01}}}
