@@ -28,11 +28,16 @@ To get started with the Quantum Mini-Apps framework, follow these steps:
 git clone https://github.com/radical-cybertools/quantum-mini-apps.git
 ```
 
-2. Install the required dependencies:
+2. Install the required dependencies and framework defined in ```pyproject.toml``` in Conda/Python env:
 ```
 cd quantum-mini-apps
 pip install --update .
-export PYTHONPATH=$PWD/src:$PYTHONPATH ### Add this statement to shell startup script (like .bashrc)
+```
+
+3. Set PYTHONPATH for easier debugging:
+
+```
+export PYTHONPATH=$PWD/src:$PYTHONPATH # Add this statement to shell startup script (like .bashrc)
 ```
 
 3. Run the provided example Mini-App:
