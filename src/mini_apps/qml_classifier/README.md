@@ -52,7 +52,13 @@ cluster_info = {
 
 ## Usage
 
-### Basic Execution
+### Command Line
+
+```
+python classifier.py
+```
+
+### Code Configuration and Execution
 ```python
 from mini_apps.qml_classifier.classifier import QMLClassifierMiniApp
 
@@ -132,18 +138,3 @@ n_qubits: 11
 vmap: true
 
 ```
-
-
-## Performance Metrics
-The mini-app collects and records the following metrics:
-- Total computation time
-- Training time per epoch
-- Hardware utilization statistics
-
-Results are saved in CSV format with timestamps for further analysis.
-
-## Hardware Requirements
-- Multi-core CPU for parallel execution
-- Sufficient system memory for batch processing
-- CUDA-capable GPU for hardware acceleration
-
