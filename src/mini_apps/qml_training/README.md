@@ -107,3 +107,4 @@ Results are saved in CSV format with timestamps for further analysis.
 ## References
 - QuGEN Framework: [https://github.com/QutacQuantum/qugen](https://github.com/QutacQuantum/qugen)
 - Pilot-Quantum: [https://github.com/radical-cybertools/pilot-quantum](https://github.com/radical-cybertools/pilot-quantum)
+- Pennylane on Perlmutter with MPI/GPU: <https://github.com/radical-cybertools/quantum-mini-apps/blob/develop/src/mini_apps/quantum_simulation/distributed_state_vector/README.md#pennylane-lightninggpu-from-source-on-perlmutter>

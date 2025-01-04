@@ -29,13 +29,10 @@ from engine.manager import MiniAppExecutor
 from engine.metrics.csv_writer import MetricsFileWriter
 
 # QuGEN imports
-from utils.discrete_qcbm_model_handler import (
+from mini_apps.qml_training.utils.discrete_qcbm_model_handler import (
     DiscreteQCBMModelHandler,
 )
 from qugen.main.data.data_handler import load_data
-
-
-
 
 
 class QMLTrainingMiniApp:
@@ -44,7 +41,7 @@ class QMLTrainingMiniApp:
         self.executor = MiniAppExecutor(cluster_config).get_executor()
         self.parameters = parameters
         self.scenario_label = scenario_label
-
+        self.cluster_config = cluster_config
         self.model = None
         self.current_datetime = datetime.datetime.now()
         self.timestamp = self.current_datetime.strftime('%Y-%m-%dT%H:%M:%S')
@@ -59,66 +56,70 @@ class QMLTrainingMiniApp:
         header = ["timestamp", "scenario_label", "num_qubits",  "compute_time_sec", "parameters", "cluster_info"]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
 
-
-    def run_training(self):                
-        # Construct the path to the dataset within the subpackage
-        package_path = os.path.dirname(__file__)
-        data_set_path = os.path.join(package_path, "data", self.parameters["build_parameters"]["data_set_name"])
-
-        data, _ = load_data(data_set_path)
-        self.model = DiscreteQCBMModelHandler()
-
-        # build a new model:
-        self.model.build(
-            self.parameters["build_parameters"]['model_type'],
-            self.parameters["build_parameters"]['data_set_name'],
-            n_qubits=self.parameters["build_parameters"]['n_qubits'],
-            n_registers=self.parameters["build_parameters"]['n_registers'],
-            circuit_depth=self.parameters["build_parameters"]['circuit_depth'],
-            initial_sigma=self.parameters["build_parameters"]['initial_sigma'],
-            circuit_type=self.parameters["build_parameters"]['circuit_type'],
-            transformation=self.parameters["build_parameters"]['transformation'],
-            hot_start_path=self.parameters["build_parameters"]['hot_start_path'],  # path to pre-trained model parameters
-            parallelism_framework = self.parameters["build_parameters"]['parallelism_framework']
-        )
-
-        # train a quantum generative model:
-        self.model.train(
-            data,  # Assuming 'data' is still an external variable not in the parameters dictionary
-            n_epochs=self.parameters["train_parameters"]['n_epochs'],
-            batch_size=self.parameters["train_parameters"]['batch_size'],
-            hist_samples=self.parameters["train_parameters"]['hist_samples'],
-        )
-        
-        # evaluate the performance of the trained model:
-        evaluation_df = self.model.evaluate(data)
-
-        # find the model with the minimum Kullbach-Liebler divergence:
-        minimum_kl_data = evaluation_df.loc[evaluation_df["kl_original_space"].idxmin()]
-        minimum_kl_calculated = minimum_kl_data["kl_original_space"]
-        print(f"{minimum_kl_calculated=}")
-
-
     def run(self): 
-         # Submit all the tasks
-        futures = self.executor.submit_tasks(self.run_training, [1])
-
-        # wait for the tasks to complete
         start_time = time.time()
-        self.executor.wait(futures)
+        # Submit the standalone function instead of the instance method
+        futures = self.executor.submit_task(run_training_task, self.parameters)
+        result = self.executor.get_results([futures])[0]
         end_time = time.time()
-        compute_time_ms = end_time-start_time
-        self.metrics_file_writer.write([self.timestamp, self.scenario_label, self.num_qubits, 
-                                        compute_time_ms, str(self.parameters), str(self.cluster_info)])
-
+        compute_time_ms = end_time - start_time
+        
+        self.metrics_file_writer.write([
+            self.timestamp,
+            self.scenario_label, 
+            self.parameters["build_parameters"]['n_qubits'],
+            compute_time_ms,
+            str(self.parameters),
+            str(self.cluster_config)
+        ])
+        
         self.metrics_file_writer.close()
 
     def close(self): 
         self.executor.close()
 
 
+def run_training_task(parameters):
+    try:
+        # Create a new instance for each task
+        model = DiscreteQCBMModelHandler()
+        
+        # Construct the path to the dataset
+        package_path = os.path.dirname(os.path.abspath(__file__))
+        data_set_path = os.path.join(package_path, "data", parameters["build_parameters"]["data_set_name"])
+        
+        data, _ = load_data(data_set_path)
+        
+        # Build and train model
+        model.build(
+            parameters["build_parameters"]['model_type'],
+            parameters["build_parameters"]['data_set_name'],
+            n_qubits=parameters["build_parameters"]['n_qubits'],
+            n_registers=parameters["build_parameters"]['n_registers'],
+            circuit_depth=parameters["build_parameters"]['circuit_depth'],
+            circuit_type=parameters["build_parameters"]['circuit_type'],
+            transformation=parameters["build_parameters"]['transformation'],
+            hot_start_path=parameters.get("build_parameters", {}).get('hot_start_path', ''),
+            parallelism_framework=parameters["build_parameters"]['parallelism_framework']
+        )
+        
+        model.train(
+            data,
+            n_epochs=parameters["train_parameters"]['n_epochs'],
+            batch_size=parameters["train_parameters"]['batch_size'],
+            hist_samples=parameters["train_parameters"]['hist_samples'],
+        )
+        
+        evaluation_df = model.evaluate(data)
+        minimum_kl_data = evaluation_df.loc[evaluation_df["kl_original_space"].idxmin()]
+        return minimum_kl_data["kl_original_space"]
+    except Exception as e:
+        print(f"Error in run_training_task: {str(e)}")
+        raise
+
+
 if __name__ == "__main__":
-    RESOURCE_URL_HPC = "slurm://localhost"
+    RESOURCE_URL_HPC = "ssh://localhost"
     WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
     CORES_PER_NODE = 2
 
@@ -134,7 +135,7 @@ if __name__ == "__main__":
                         "queue": "debug",
                         "walltime": 30,            
                         "project": "m4408",
-                        "conda_environment": "/pscratch/sd/l/luckow/conda/quantum-mini-apps2",
+                        "conda_environment": "/pscratch/sd/l/luckow/conda/quantum-mini-apps-qml",
                         "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
                     }
                 }
@@ -153,7 +154,7 @@ if __name__ == "__main__":
             "parallelism_framework": "jax"
         },
         "train_parameters": {            
-            'n_epochs': 3,
+            'n_epochs': 1,
             'batch_size': 200,
             'hist_samples': 100000
         }
