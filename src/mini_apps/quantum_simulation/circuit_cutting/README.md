@@ -11,6 +11,10 @@ The Quantum Circuit Cutting Mini-App is a benchmarking tool designed to evaluate
 - Comprehensive metrics collection and reporting
 - Support for both local and HPC (Perlmutter) environments
 
+## Background
+
+Circuit cutting is a technique to increase the size of circuits we can run on quantum hardware at the cost of an additional sampling overhead. A larger quantum circuit can be decomposed by cutting its gates and wires, resulting in smaller circuits that can be executed within the constraints of available quantum hardware. The results of these smaller circuits are combined to reconstruct the outcome of the original problem. Quantum Mini app framework uses Qiskit’s circuit quasiprobability decomposition (QPD) method. QPD allows the splitting of large quantum circuits into smaller sub-circuits that can be run on smaller quantum hardware or simulators with limited qubits. However, this comes with a cost: the number of times the sub-circuits need to be executed increases exponentially as the circuit size grows.
+
 ## Configuration
 
 ### Hardware Configuration

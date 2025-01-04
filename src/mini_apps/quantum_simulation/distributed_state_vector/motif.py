@@ -247,7 +247,7 @@ class DistStateVector(Motif):
                     n_wires,
                     n_layers,
                     runtime,
-                    str(result[0]),
+                    str(result[0])[:10],
                     enable_jacobian,
                     enable_qjit,
                     mpi_startup_time

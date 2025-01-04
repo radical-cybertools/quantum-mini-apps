@@ -36,7 +36,7 @@ BENCHMARK_CONFIG = {
     ],
     'circuit_configs': [
         {
-            'qubit_sizes': [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41],
+            'qubit_sizes': [35, 36, 37, 38, 39, 40, 41],
             'enable_jacobian': [False, True],
         }
     ]
@@ -53,8 +53,8 @@ def create_cluster_info_perlmutter(nodes, cores=128, gpus=4):
             "number_of_nodes": nodes,
             "cores_per_node": cores,
             "gpus_per_node": gpus,
-            "queue": "premium",
-            #"queue": "regular",
+            #"queue": "premium",
+            "queue": "regular",
             "walltime": 360,            
             "project": "m4408",
             "scheduler_script_commands": ["#SBATCH --constraint=gpu&hbm80g",

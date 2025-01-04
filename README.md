@@ -17,8 +17,7 @@ The main components of the framework are:
 Architecture
 ----
 
-![Mini App Architecture diagram](https://github.com/radical-cybertools/quantum-mini-apps/blob/main/mini-app-arch.pdf)
-
+<img src="https://github.com/radical-cybertools/quantum-mini-apps/blob/main/docs/mini-app-arch.png" alt="Mini App Architecture diagram" width="800" style="display: block; margin: auto;">
 
 ## Getting Started
 
@@ -48,16 +47,12 @@ To run on Perlmutter, follow [Using Dask on Perlmutter](https://gitlab.com/NERSC
 
 
 ## Extending the Mini-App framework
-Contributions to the Quantum Mini-Apps framework are welcome! If you encounter any issues or have suggestions for improvements, please open an issue or submit a pull request.
-
-To customize the framework or develop your own Mini-Apps/Motifs, you can extend the base Motif class which provides executor as an abstraction for executing the mini-apps. 
-
+Contributions to the Quantum Mini-Apps framework are welcome! If you encounter any issues or have suggestions for improvements, please open an issue or submit a pull request. 
 
 ## Mini Apps
-The following Mini-Apps are currently implemented
+The following Mini-Apps are currently implemented:
 
 ### Quantum Simulation
-The Quantum Simulation mini-app implements following motifs
 
 [**Circuit Execution**](src/mini_apps/quantum_simulation/circuit_execution/README.md)
 
@@ -66,7 +61,7 @@ The Quantum Simulation mini-app implements following motifs
 [**State Vector Mini-Apps**](src/mini_apps/quantum_simulation/distributed_state_vector/README.md)
 
 
-### QML Data Compression & Training
+### Quantum Machine Learning 
 
 [**QML Classifier**](src/mini_apps/qml_classifier/README.md)
 
@@ -78,9 +73,9 @@ The Quantum Simulation mini-app implements following motifs
 ## References
 - Pilot-Quantum: [https://github.com/radical-cybertools/pilot-quantum](https://github.com/radical-cybertools/pilot-quantum)
 - QuGEN Framework: [https://github.com/QutacQuantum/qugen](https://github.com/QutacQuantum/qugen)
-- Saurabh, N., et al. "Quantum Mini-Apps: A Framework for Benchmarking Quantum Computing Systems" [arXiv:2412.18519](https://arxiv.org/abs/2412.18519)
-- Saurabh, N., et al. "Pilot-Quantum: A Runtime System for Quantum Computing Applications" [arXiv:2405.07333](https://arxiv.org/abs/2405.07333)
-- Saurabh, N., et al. "Quantum Computing Mini-Applications: Characterizing Quantum Computing Execution Models" [arXiv:2308.06608](https://arxiv.org/abs/2308.06608)
+- Saurabh, N., et al. "Quantum Mini-Apps: A Framework for Developing and Benchmarking Quantum-HPC Applications" [arXiv:2412.18519](https://arxiv.org/abs/2412.18519)
+- Saurabh, N., et al. "Pilot-Quantum: A Quantum-HPC Middleware for Resource, Workload and Task Management" [arXiv:2405.07333](https://arxiv.org/abs/2405.07333)
+- Saurabh, N., et al. "A Conceptual Architecture for a Quantum-HPC Middleware" [arXiv:2308.06608](https://arxiv.org/abs/2308.06608)
 
 
 
