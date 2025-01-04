@@ -13,7 +13,7 @@ from qiskit_ionq import IonQProvider
 
 from engine.metrics.csv_writer import MetricsFileWriter
 from engine.base.base_motif import Motif
-from mini_apps.quantum_simulation.motifs.qiskit_benchmark import generate_data
+from mini_apps.quantum_simulation.circuit_execution.motifs.qiskit_benchmark import generate_data
 import datetime
 # from qiskit_rigetti import RigettiQCSProvider
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager

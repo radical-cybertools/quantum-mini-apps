@@ -1,7 +1,7 @@
 import os
 
 from engine.manager import MiniAppExecutor
-from mini_apps.quantum_simulation.motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSERVABLE, CIRCUIT_DEPTH, \
+from mini_apps.quantum_simulation.circuit_execution.motifs.circuit_execution_motif import CircuitExecutionBuilder, SIZE_OF_OBSERVABLE, CIRCUIT_DEPTH, \
     NUM_ENTRIES, QUBITS, QISKIT_BACKEND_OPTIONS
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
