@@ -40,7 +40,7 @@ pip install --update .
 export PYTHONPATH=$PWD/src:$PYTHONPATH # Add this statement to shell startup script (like .bashrc)
 ```
 
-3. Run the provided example Mini-App:
+4. Run an Mini-App:
 
 ```commandline
 python src/mini_apps/quantum_simulation/circuit_execution/ce_local.py
@@ -48,14 +48,11 @@ python src/mini_apps/quantum_simulation/circuit_execution/ce_local.py
 
 This will execute the `QuantumSimulation` Mini-App with the default configuration, which runs a circuit execution motif on a local Dask cluster.
 
-To run on Perlmutter, follow [Using Dask on Perlmutter](https://gitlab.com/NERSC/nersc-notebooks/-/tree/main/perlmutter/dask#using-dask-on-perlmutter) to provision dask cluster, and run ```python mini-apps/quantum-simulation/ce_perlmutter.py``` against the running Perlmutter dask cluster.
-
-
 ## Extending the Mini-App framework
 Contributions to the Quantum Mini-Apps framework are welcome! If you encounter any issues or have suggestions for improvements, please open an issue or submit a pull request. 
 
 ## Mini Apps
-The following Mini-Apps are currently implemented:
+Each Mini-App provides an in-depth documentation. The following Mini-Apps are currently implemented:
 
 ### Quantum Simulation
 
@@ -70,7 +67,7 @@ The following Mini-Apps are currently implemented:
 
 [**QML Classifier**](src/mini_apps/qml_classifier/README.md)
 
-[**QML Data Compression**](src/mini_apps/qml_data_compression/README.md)
+[**QML Compression**](src/mini_apps/qml_compression/README.md)
 
 [**QML Training**](src/mini_apps/qml_training/README.md)
 

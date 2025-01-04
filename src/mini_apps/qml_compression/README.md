@@ -18,25 +18,11 @@ The mini-app leverages several quantum computing concepts:
 - **Matrix Product States**: Represents quantum many-body states efficiently using tensor networks
 - **Quantum Circuit Optimization**: Uses variational quantum algorithms to find optimal circuit parameters
 
-## Requirements
-
-### Software Dependencies
-- Python 3.10
-- PennyLane >= 0.30.0
-- NumPy >= 1.21.0
-- PyYAML >= 6.0.0
-- Ray >= 2.3.0 (for distributed computing)
-- Matplotlib >= 3.5.0 (for visualization)
-- SciPy >= 1.7.0
-
-### Hardware Requirements
-- SLURM-based HPC environment
-- Minimum 16GB RAM per node
-- High-speed interconnect for distributed computing
-
 ## Usage
 
-
+```
+python qml_compression.py --num_nodes 1
+```
 
 
 

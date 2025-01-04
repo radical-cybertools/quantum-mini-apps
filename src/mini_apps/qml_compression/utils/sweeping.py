@@ -3,7 +3,7 @@ import scipy as sp
 from time import perf_counter
 
 import warnings
-warnings.filterwarnings("ignore", category=np.ComplexWarning)
+#warnings.filterwarnings("ignore", category=np.ComplexWarning)
 
 def random_unitaries(shape, strength=1e-2, orthogonal=False):
     if orthogonal:
