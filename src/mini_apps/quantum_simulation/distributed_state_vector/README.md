@@ -151,8 +151,7 @@ salloc -N 2 -c 32 --qos interactive --time 0:30:00 --constraint gpu --ntasks-per
 
 
 * Make sure you update .bashrc so compute nodes will have the same settings
-
-    ```
+```
 
 module load PrgEnv-gnu cray-mpich cudatoolkit craype-accel-nvidia80 python
 source $SCRATCH/lgpu_env/bin/activate
@@ -160,7 +159,7 @@ export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
 export MPICH_GPU_SUPPORT_ENABLED=1
 export PYTHONPATH=$HOME/quantum-mini-apps/src:$HOME/pilot-quantum:$PYTHONPATH
 
-    ```
+```
 
 * Compiler Commands:
 
