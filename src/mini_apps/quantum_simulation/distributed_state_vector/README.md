@@ -165,7 +165,7 @@ export PYTHONPATH=$HOME/quantum-mini-apps/src:$HOME/pilot-quantum:$PYTHONPATH
 
 ```
 
-* Compiler Commands:
+<!-- * Compiler Commands:
 
 
     * create conda env
@@ -201,7 +201,7 @@ export PYTHONPATH=$HOME/quantum-mini-apps/src:$HOME/pilot-quantum:$PYTHONPATH
 
     ```
     CMAKE_ARGS="-DENABLE_MPI=ON -DCMAKE_C_COMPILER=/opt/cray/pe/craype/2.7.30/bin/cc -DCMAKE_CXX_COMPILER=/opt/cray/pe/craype/2.7.30/bin/CC" python -m pip install -e . --config-settings editable_mode=compat -vv
-    ```
+    ``` -->
 
 ## Pennylane
 
