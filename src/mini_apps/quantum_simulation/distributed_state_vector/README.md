@@ -120,6 +120,10 @@ cd pennylane-lightning
 git checkout latest_release
 pip install -r requirements.txt
 pip install custatevec-cu12
+
+#Install cquantum sdk
+export CUQUANTUM_SDK=${PSCRATCH}/sw/cuquantum-linux-x86_64-24.11.0.21_cuda12-archive
+
 PL_BACKEND="lightning_gpu" python scripts/configure_pyproject_toml.py
 CMAKE_ARGS="-DENABLE_MPI=on -DCMAKE_CXX_COMPILER=$(which CC)"  python -m pip install -e . --config-settings editable_mode=compat -vv
 
