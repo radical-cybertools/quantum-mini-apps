@@ -94,11 +94,78 @@ The quantum circuit implements a Strongly Entangling Layer pattern:
 * Modules:
     
     ```
-    module load conda python
-    module load PrgEnv-gnu mpich cudatoolkit craype-accel-nvidia80 cudnn/8.3.2
+        module load PrgEnv-gnu cray-mpich cudatoolkit craype-accel-nvidia80 python
+
     ```
 
-* Compiler Commands:
+* Set up your python environment, preferably on the SCRATCH partition
+    ``` 
+
+    python -m venv lgpu_env && source lgpu_env/bin/activate
+    
+    ```
+
+* Build mpi4py 
+    ```
+
+    MPICC="cc -shared" pip install --force --no-cache-dir --no-binary=mpi4py mpi4py
+
+    ```
+
+* Install pennylane-lightning gpu with mpi 
+
+```
+
+cd pennylane-lightning
+git checkout latest_release
+pip install -r requirements.txt
+pip install custatevec-cu12
+
+#Install cquantum sdk
+export CUQUANTUM_SDK=${PSCRATCH}/sw/cuquantum-linux-x86_64-24.11.0.21_cuda12-archive
+
+PL_BACKEND="lightning_gpu" python scripts/configure_pyproject_toml.py
+CMAKE_ARGS="-DENABLE_MPI=on -DCMAKE_CXX_COMPILER=$(which CC)"  python -m pip install -e . --config-settings editable_mode=compat -vv
+
+```
+
+
+* Ensure the CRAY library paths are used for the MPI enviroment to be visible by the NVIDIA cuQuantum libraries https://support.hpe.com/hpesc/public/docDisplay?docLocale=en_US&docId=a00113984en_us&page=Modify_Linking_Behavior_to_Use_Non-default_Libraries.html
+
+```
+
+export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
+
+```
+
+* Follow NERSCs recommendations for using GPU-aware MPI https://docs.nersc.gov/development/languages/python/using-python-perlmutter/#using-mpi4py-with-gpu-aware-cray-mpich
+
+```
+
+export MPICH_GPU_SUPPORT_ENABLED=1
+
+```
+
+* Allocate your nodes/GPUs, and ensure each process can see all others on each respective local node.
+```
+
+salloc -N 2 -c 32 --qos interactive --time 0:30:00 --constraint gpu --ntasks-per-node=4 --gpus-per-task=1 --gpu-bind=none --account=<Account ID>
+
+```
+
+
+* Make sure you update .bashrc so compute nodes will have the same settings
+```
+
+module load PrgEnv-gnu cray-mpich cudatoolkit craype-accel-nvidia80 python
+source $SCRATCH/lgpu_env/bin/activate
+export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
+export MPICH_GPU_SUPPORT_ENABLED=1
+export PYTHONPATH=$HOME/quantum-mini-apps/src:$HOME/pilot-quantum:$PYTHONPATH
+
+```
+
+<!-- * Compiler Commands:
 
 
     * create conda env
@@ -134,7 +201,7 @@ The quantum circuit implements a Strongly Entangling Layer pattern:
 
     ```
     CMAKE_ARGS="-DENABLE_MPI=ON -DCMAKE_C_COMPILER=/opt/cray/pe/craype/2.7.30/bin/cc -DCMAKE_CXX_COMPILER=/opt/cray/pe/craype/2.7.30/bin/CC" python -m pip install -e . --config-settings editable_mode=compat -vv
-    ```
+    ``` -->
 
 ## Pennylane
 
