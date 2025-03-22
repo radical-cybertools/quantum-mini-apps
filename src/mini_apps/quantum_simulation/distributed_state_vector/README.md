@@ -94,7 +94,7 @@ The quantum circuit implements a Strongly Entangling Layer pattern:
 * Modules:
     
     ```
-        module load PrgEnv-gnu cray-mpich cudatoolkit craype-accel-nvidia80 python
+        module load PrgEnv-gnu cray-mpich cudatoolkit craype-accel-nvidia80 python cray-mpich-abi
 
     ```
 
