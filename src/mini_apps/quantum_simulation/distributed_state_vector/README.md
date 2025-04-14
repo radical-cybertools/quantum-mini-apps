@@ -151,9 +151,11 @@ export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
 
 1. Allocate Interactive GPU Job (4 GPUs)
 
-   ```salloc -N 1 -c 32 --qos interactive --time 0:30:00 \
+   ```
+   salloc -N 1 -c 32 --qos interactive --time 0:30:00 \
        --constraint gpu --ntasks-per-node=4 \
-       --gpus-per-task=1 --gpu-bind=none --account=XYZ```
+       --gpus-per-task=1 --gpu-bind=none --account=XYZ
+   ```
 
 2. Run Your Script with MPI
 
