@@ -92,21 +92,73 @@ The quantum circuit implements a Strongly Entangling Layer pattern:
     * https://discuss.pennylane.ai/t/pennylane-multi-gpu-script-fails-with-error-even-there-are-enough-gpus/3978/28
 
 
-```These steps produce a working Lightning GPU install (as of now 0.41.0-rc)
+# ⚡ PennyLane Lightning GPU on Perlmutter (Cray MPICH + CUDA 12)
 
-Ensure Python 3.10+ is used to create the venv (module load python/3.11)
-Ensure the appropriate modules are loaded (module load PrgEnv-gnu cray-mpich cudatoolkit craype-accel-nvidia80)
-Clone pennylane-lightning, install the requirements-dev.txt file and then install Lightning Qubit as python -m pip install -r requirements-dev.txt && CC=$(which cc) CXX=$(which CC) python -m pip install . --verbose) with the CC env-vars used to set the CrayPE compilers, which default to the GNU env
-Change the package to Lightning GPU and install that using the CrayPE compiler for MPI support (CMAKE_ARGS="-DENABLE_MPI=ON" CC=$(which mpicc) CXX=$(which mpicxx) python -m pip install . --verbose)
-Install mpi4py using CrayPE MPICH (MPICC="cc -shared" pip install --force-reinstall --no-cache-dir --no-binary=mpi4py mpi4py)
-Ensure the Cray MPICH libraries are available for dynamic loading by NVIDIA custatevec (export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH)
-Allocate a debug session with 4 GPUs (salloc -N 1 -c 32 --qos interactive --time 0:30:00 --constraint gpu --ntasks-per-node=4 --gpus-per-task=1 --gpu-bind=none --account=XYZ)
-Create an MPI-friendly script and run it with the above allocation (srun -n 4 python myscript.py)
-Note: we will release a new version of PennyLane in the next couple of days so if you want to wait until Wednesday to do this you can use PennyLane v0.41```
+This repository provides instructions for setting up and running the [`pennylane-lightning[gpu]`](https://github.com/PennyLaneAI/pennylane-lightning) backend on NERSC's **Perlmutter** system. These steps are validated for `v0.41.0-rc` and are compatible with **Cray MPICH**, **CUDA 12**, and **Lightning GPU**.
 
+---
 
+## 📦 Requirements
 
+- Python 3.10+ (Python 3.11 recommended)
+- Access to NERSC's Perlmutter system
+- Cray MPICH and CUDA 12 toolchain
 
+---
+
+## 🔧 Setup Instructions
+
+### 1. Load Required Modules
+
+```
+module load python/3.11
+module load PrgEnv-gnu cray-mpich cudatoolkit craype-accel-nvidia80
+```
+
+### 2. Clone and Install Dependencies
+
+```
+git clone https://github.com/PennyLaneAI/pennylane-lightning.git
+cd pennylane-lightning
+python -m pip install -r requirements-dev.txt
+```
+
+### 3. Install Lightning Qubit with CrayPE Compilers
+
+```
+CC=$(which cc) CXX=$(which CC) python -m pip install . --verbose
+```
+
+### 4. Switch to Lightning GPU with MPI Support
+
+```
+CMAKE_ARGS="-DENABLE_MPI=ON" CC=$(which mpicc) CXX=$(which mpicxx) python -m pip install . --verbose
+```
+
+### 5.  Install mpi4py with Cray MPICH
+
+```
+MPICC="cc -shared" pip install --force-reinstall --no-cache-dir --no-binary=mpi4py mpi4py
+```
+
+### 6. Set Library Paths for custatevec
+
+```
+export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
+```
+
+🚀 Running an MPI Job
+1. Allocate Interactive GPU Job (4 GPUs)
+
+   ```salloc -N 1 -c 32 --qos interactive --time 0:30:00 \
+       --constraint gpu --ntasks-per-node=4 \
+       --gpus-per-task=1 --gpu-bind=none --account=XYZ```
+
+2. Run Your Script with MPI
+
+   ```
+   srun -n 4 python myscript.py
+   ```
 
 
 <!-- * Compiler Commands:
