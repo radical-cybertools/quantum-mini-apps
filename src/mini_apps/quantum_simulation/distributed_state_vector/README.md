@@ -147,7 +147,8 @@ MPICC="cc -shared" pip install --force-reinstall --no-cache-dir --no-binary=mpi4
 export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
 ```
 
-🚀 Running an MPI Job
+### 7. 🚀 Running an MPI Job
+
 1. Allocate Interactive GPU Job (4 GPUs)
 
    ```salloc -N 1 -c 32 --qos interactive --time 0:30:00 \
