@@ -89,81 +89,25 @@ The quantum circuit implements a Strongly Entangling Layer pattern:
 * Source:
     * https://pennylane.ai/blog/2023/09/distributing-quantum-simulations-using-lightning-gpu-with-NVIDIA-cuQuantum
     * https://github.com/PennyLaneAI/pennylane-lightning
+    * https://discuss.pennylane.ai/t/pennylane-multi-gpu-script-fails-with-error-even-there-are-enough-gpus/3978/28
 
 
-* Modules:
-    
-    ```
-        module load PrgEnv-gnu cray-mpich cudatoolkit craype-accel-nvidia80 python cray-mpich-abi
+```These steps produce a working Lightning GPU install (as of now 0.41.0-rc)
 
-    ```
-
-* Set up your python environment, preferably on the SCRATCH partition
-    ``` 
-
-    python -m venv lgpu_env && source lgpu_env/bin/activate
-    
-    ```
-
-* Build mpi4py 
-    ```
-
-    MPICC="cc -shared" pip install --force --no-cache-dir --no-binary=mpi4py mpi4py
-
-    ```
-
-* Install pennylane-lightning gpu with mpi 
-
-```
-
-cd pennylane-lightning
-git checkout latest_release
-pip install -r requirements.txt
-pip install custatevec-cu12
-
-#Install cquantum sdk
-export CUQUANTUM_SDK=${PSCRATCH}/sw/cuquantum-linux-x86_64-24.11.0.21_cuda12-archive
-
-PL_BACKEND="lightning_gpu" python scripts/configure_pyproject_toml.py
-CMAKE_ARGS="-DENABLE_MPI=on -DCMAKE_CXX_COMPILER=$(which CC)"  python -m pip install -e . --config-settings editable_mode=compat -vv
-
-```
+Ensure Python 3.10+ is used to create the venv (module load python/3.11)
+Ensure the appropriate modules are loaded (module load PrgEnv-gnu cray-mpich cudatoolkit craype-accel-nvidia80)
+Clone pennylane-lightning, install the requirements-dev.txt file and then install Lightning Qubit as python -m pip install -r requirements-dev.txt && CC=$(which cc) CXX=$(which CC) python -m pip install . --verbose) with the CC env-vars used to set the CrayPE compilers, which default to the GNU env
+Change the package to Lightning GPU and install that using the CrayPE compiler for MPI support (CMAKE_ARGS="-DENABLE_MPI=ON" CC=$(which mpicc) CXX=$(which mpicxx) python -m pip install . --verbose)
+Install mpi4py using CrayPE MPICH (MPICC="cc -shared" pip install --force-reinstall --no-cache-dir --no-binary=mpi4py mpi4py)
+Ensure the Cray MPICH libraries are available for dynamic loading by NVIDIA custatevec (export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH)
+Allocate a debug session with 4 GPUs (salloc -N 1 -c 32 --qos interactive --time 0:30:00 --constraint gpu --ntasks-per-node=4 --gpus-per-task=1 --gpu-bind=none --account=XYZ)
+Create an MPI-friendly script and run it with the above allocation (srun -n 4 python myscript.py)
+Note: we will release a new version of PennyLane in the next couple of days so if you want to wait until Wednesday to do this you can use PennyLane v0.41```
 
 
-* Ensure the CRAY library paths are used for the MPI enviroment to be visible by the NVIDIA cuQuantum libraries https://support.hpe.com/hpesc/public/docDisplay?docLocale=en_US&docId=a00113984en_us&page=Modify_Linking_Behavior_to_Use_Non-default_Libraries.html
-
-```
-
-export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
-
-```
-
-* Follow NERSCs recommendations for using GPU-aware MPI https://docs.nersc.gov/development/languages/python/using-python-perlmutter/#using-mpi4py-with-gpu-aware-cray-mpich
-
-```
-
-export MPICH_GPU_SUPPORT_ENABLED=1
-
-```
-
-* Allocate your nodes/GPUs, and ensure each process can see all others on each respective local node.
-```
-
-salloc -N 2 -c 32 --qos interactive --time 0:30:00 --constraint gpu --ntasks-per-node=4 --gpus-per-task=1 --gpu-bind=none --account=<Account ID>
-
-```
 
 
-* Make sure you update .bashrc so compute nodes will have the same settings
-```
 
-module load PrgEnv-gnu cray-mpich cudatoolkit craype-accel-nvidia80 python
-source $SCRATCH/lgpu_env/bin/activate
-export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
-export MPICH_GPU_SUPPORT_ENABLED=1
-export PYTHONPATH=$HOME/quantum-mini-apps/src:$HOME/pilot-quantum:$PYTHONPATH
-
-```
 
 <!-- * Compiler Commands:
 
