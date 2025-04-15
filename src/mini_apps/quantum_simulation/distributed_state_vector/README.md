@@ -113,6 +113,9 @@ This repository provides instructions for setting up and running the [`pennylane
 ```
 module load python/3.11
 module load PrgEnv-gnu cray-mpich cudatoolkit craype-accel-nvidia80
+
+cd $SCRATCH
+python -m venv lgpu_env && source lgpu_env/bin/activate
 ```
 
 ### 2. Clone and Install Dependencies
@@ -120,18 +123,19 @@ module load PrgEnv-gnu cray-mpich cudatoolkit craype-accel-nvidia80
 ```
 git clone https://github.com/PennyLaneAI/pennylane-lightning.git
 cd pennylane-lightning
-python -m pip install -r requirements-dev.txt
+git checkout latest_release
 ```
 
 ### 3. Install Lightning Qubit with CrayPE Compilers
 
 ```
-CC=$(which cc) CXX=$(which CC) python -m pip install . --verbose
+python -m pip install -r requirements-dev.txt && CC=$(which cc) CXX=$(which CC) python -m pip install . --verbose 
 ```
 
 ### 4. Switch to Lightning GPU with MPI Support
 
 ```
+PL_BACKEND="lightning_gpu" python scripts/configure_pyproject_toml.py 
 CMAKE_ARGS="-DENABLE_MPI=ON" CC=$(which mpicc) CXX=$(which mpicxx) python -m pip install . --verbose
 ```
 
