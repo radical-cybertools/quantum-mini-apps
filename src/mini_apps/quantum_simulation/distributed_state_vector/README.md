@@ -101,6 +101,7 @@ This repository provides instructions for setting up and running the [`pennylane
 ## 📦 Requirements
 
 - Python 3.10+ (Python 3.11 recommended)
+- Pennylane Lightning (v0.41.0)
 - Access to NERSC's Perlmutter system
 - Cray MPICH and CUDA 12 toolchain
 
@@ -123,7 +124,7 @@ python -m venv lgpu_env && source lgpu_env/bin/activate
 ```
 git clone https://github.com/PennyLaneAI/pennylane-lightning.git
 cd pennylane-lightning
-git checkout latest_release
+git checkout latest_release ### Testing with (v0.41.0)
 ```
 
 ### 3. Install Lightning Qubit with CrayPE Compilers
