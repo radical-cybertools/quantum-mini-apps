@@ -15,6 +15,8 @@ from mini_apps.qml_data_compression.utils.unitary_to_pennylane import UnitaryToP
 from time import perf_counter
 
 import argparse
+import numpy as np
+import tensorflow_datasets as tfds
 
 
 parser = argparse.ArgumentParser(description="QML Data Compression Mini App")
@@ -42,6 +44,7 @@ class QMLCompressionMiniApp:
         n_batches = next(processes_max - i for i in range(processes_max) if self.app_config["n_samples"] % (processes_max - i) == 0)
         batched_indices = np.arange(self.app_config["n_samples"]).reshape(n_batches, -1)
         batched_indices = [indices.tolist() for indices in batched_indices]
+        print(f"Batch size: {len(batched_indices[0])}")
         futures = self.executor.submit_tasks(workflow_batch, batched_indices)
         self.executor.wait(futures)
         compute_time_sec = perf_counter() - start
@@ -56,7 +59,7 @@ def workflow(index: int):
     # Step 0: Encode the image the image as quantum state and transform it to target MPS
     times = {}
     times["time_start_loading"] = perf_counter()
-    image = np.load(f"/pscratch/sd/f/fkiwit/data/{index}.npy", allow_pickle=True)
+    image = np.load(os.path.join(DATA_DIRECTORY, f"{index}.npy"), allow_pickle=True)
     states = FRQI_RGBa_encoding(image[None])
     target_tensor, Lambdtarget_tensor = calc_MPS(np.asarray(states))
     target_tensor = right_canonical(target_tensor)
@@ -98,6 +101,46 @@ if __name__ == "__main__":
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     WORKING_DIRECTORY = os.path.join(os.environ["PSCRATCH"], f"work_nodes16_32/{timestamp}")
+
+    dataset_name = "cifar10"
+    DATA_DIRECTORY = os.path.join(os.environ["PSCRATCH"], "miniapp_datasets", dataset_name)
+    
+    os.makedirs(DATA_DIRECTORY, exist_ok=True)
+    
+    # Check if dataset files already exist
+    dataset_exists = True
+    for i in range(100):
+        # Check that the files exist and are in the right format
+        if not os.path.exists(os.path.join(DATA_DIRECTORY, f"{i}.npy")):
+            dataset_exists = False
+            break
+    
+    if dataset_exists:
+        print(f"Dataset already exists in {DATA_DIRECTORY}. Skipping download.")
+    else:
+        print("Loading CIFAR-10 dataset...")
+        
+        # Load CIFAR-10 dataset
+        dataset = tfds.load(dataset_name, split=['train', 'test'], as_supervised=False)
+        train_ds, test_ds = dataset
+
+        # Convert to numpy arrays
+        train_images = np.array([example['image'] for example in tfds.as_numpy(train_ds)])
+        test_images = np.array([example['image'] for example in tfds.as_numpy(test_ds)])
+        all_images = np.vstack([train_images, test_images])
+        print(f"Dataset loaded: {all_images.shape} images")
+
+        # Save each image separately
+        print(f"Saving images to {DATA_DIRECTORY}...")
+        for i, img in enumerate(all_images):
+            if i >= app_config["n_samples"]:
+                break
+            np.save(os.path.join(DATA_DIRECTORY, f"{i}.npy"), img)
+            if i % 5000 == 0:
+                print(f"Saved {i} images")
+
+        print(f"Saved {min(app_config['n_samples'], len(all_images))} images to {DATA_DIRECTORY}")
+
     RESOURCE_URL_HPC = "slurm://localhost"
 
     os.makedirs(WORKING_DIRECTORY, exist_ok=True)
@@ -115,9 +158,9 @@ if __name__ == "__main__":
             "number_of_nodes": num_nodes,
             "cores_per_node": num_cpus,
             "gpus_per_node": 0,
-            "queue": "premium",
-            # "walltime": 30,
-            "walltime": int(1920 / num_nodes),
+            "queue": "debug",
+            "walltime": 30,
+            # "walltime": int(1920 / num_nodes),
             "type": "ray",
             "project": "m4408",
             "conda_environment": "/pscratch/sd/f/fkiwit/conda/qma/",

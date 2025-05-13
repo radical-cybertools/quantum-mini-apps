@@ -20,7 +20,8 @@ qiskit = " 1.1.1"
 qiskit-aer = "0.14.2"
 qiskit_ibm_runtime = "*"
 qiskit_ionq = "*"
-
+tensorflow-datasets = "4.9.8"
+tensorflow-cpu = "2.19.0"
 
 [build-system]
 requires = ["poetry-core"]
