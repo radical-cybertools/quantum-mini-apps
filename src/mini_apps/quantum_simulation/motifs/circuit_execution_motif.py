@@ -20,6 +20,12 @@ def run_circuit(circ_obs, qiskit_backend_options):
     print(estimator_result)
     return estimator_result
 
+def sleep_0(circ_obs, qiskit_backend_options):
+    # Function to determine the pilot quantum overhead when accessing quantum hardware in a perfect scenario without queueing time
+    # (see Fig. 3 IBM Eagle in https://arxiv.org/abs/2412.18519)
+    time.sleep(0)
+    estimator_result = None
+    return estimator_result
 
 class CircuitExecutionBuilder:
     def __init__(self):
@@ -105,6 +111,7 @@ class CircuitExecution(Motif):
         
         # Submit all the tasks
         futures = self.executor.submit_tasks(run_circuit, circuits_observables, self.qiskit_backend_options)
+        # futures = self.executor.submit_tasks(sleep_0, circuits_observables, self.qiskit_backend_options)
 
         # wait for the tasks to complete
         start_time = time.time()
