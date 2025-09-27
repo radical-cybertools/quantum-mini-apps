@@ -40,7 +40,7 @@ from qiskit import qpy
 # Local imports
 from engine.metrics.csv_writer import MetricsFileWriter
 from engine.base.base_motif import Motif
-from mini_apps.quantum_simulation.motifs.qiskit_benchmark import generate_data
+from mini_apps.quantum_simulation.circuit_execution.motifs.qiskit_benchmark import generate_data
 
 
 # Configuration parameter keys
@@ -165,7 +165,7 @@ def execute_sampler(backend_options, label, subsystem_subexpts, shots):
             return (label, new_result)
     except Exception as e:
         logging.error(f"Error executing sampler: {str(e)}")
-        raise
+        return None  # Return None explicitly when there's an error
 
 
 # Full Circuit Simulation
@@ -676,8 +676,16 @@ class CircuitCutting(Motif):
         # Get all samplePubResults
         samplePubResults = collections.defaultdict(list)
         for result in results_tuple:
+            if result is None:
+                self.logger.warning("Skipping None result from failed task")
+                continue
             self.logger.info(f"Result: {result[0], result[1]}")
             samplePubResults[result[0]].extend(result[1]._pub_results)
+
+        # Check if we have any valid results
+        if not samplePubResults:
+            self.logger.error("No valid results obtained from circuit cutting execution")
+            return None, {"error": "No valid results"}
 
         results = {}
         for label, samples in samplePubResults.items():
@@ -859,7 +867,12 @@ class CircuitCutting(Motif):
 
         if self.full_circuit_only == False: # Run circuit cutting experiments
             final_expval, metrics = self.run_circuit_cutting(circuit, observable, circuit_cutting_qiskit_options)
-            
+
+            # Check if circuit cutting was successful
+            if final_expval is None or 'error' in metrics:
+                self.logger.error("Circuit cutting failed, cannot proceed")
+                return
+
             # Store metrics for later use
             circuit_cutting_transpile_time_secs = metrics['transpile_time']
             circuit_cutting_exec_time_secs = metrics['subcircuit_exec_time']
