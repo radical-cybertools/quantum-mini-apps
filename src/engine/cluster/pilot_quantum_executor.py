@@ -7,19 +7,19 @@ from engine.cluster.base_executor import Executor
 from engine.cluster.dask_executor import DaskExecutor   
 import psutil
 import subprocess
+from pilot.dreamer import QuantumTask, TaskType
 
 
 
 
 class PilotQuantumExecutor(Executor):
 
-    
-
     def __init__(self, cluster_config=None):
         super().__init__()
         self.cluster_config = cluster_config or {}
         self.type = self.cluster_config["config"]["type"]
-        self.pilot, self.client = self.initialize_client(self.cluster_config["config"])
+        self.pcs, self.pilot, self.client = self.initialize_client(self.cluster_config["config"])
+        self.pilots = self.pcs.get_pilots()
 
     def initialize_client(self, cluster_config):
         pilot_compute_description = cluster_config
@@ -27,10 +27,18 @@ class PilotQuantumExecutor(Executor):
         working_directory = cluster_config["working_directory"]
     
         pcs = PilotComputeService(execution_engine=execution_engine, working_directory=working_directory)
-        pilot = pcs.create_pilot(pilot_compute_description=pilot_compute_description)
-        pilot.wait()
+        pilots = []
+        for pilot_compute_description in cluster_config["pilots"]:
+            pilot = pcs.create_pilot(pilot_compute_description=pilot_compute_description)
+            pilots.append(pilot)
+
+        for pilot in pilots:
+            pilot.wait()
+
+        pcs.initialize_dreamer(cluster_config["dreamer_strategy"])
+
         dask_ray_client = pilot.get_client()
-        return pilot, dask_ray_client
+        return pcs, pilot, dask_ray_client
 
     def close(self):
         if self.type == "dask":
@@ -63,6 +71,17 @@ class PilotQuantumExecutor(Executor):
         args = args[1:]  # Remove the first argument
         
         return [self.pilot.submit_task(compute_func, task, *args,  **kwargs) for task in input_tasks]
+
+
+    def submit_tasks_quantum(self, circuit_func, num_qubits, gate_set, *args,  **kwargs):
+        input_tasks = args[0]  # The first argument is the collection of tasks
+        args = args[1:]  # Remove the first argument
+        
+        return [self.submit_quantum_task(circuit_func, num_qubits, gate_set, task, *args,  **kwargs) for task in input_tasks]
+
+
+    def submit_quantum_task(self, qt):        # Create quantum task        
+        return self.pcs.submit_quantum_task(qt)
 
 
     def wait(self, futures):
