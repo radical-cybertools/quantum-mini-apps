@@ -333,18 +333,19 @@ class CircuitCutting(Motif):
         self.metadata = None
         header = [
             "experiment_start_time",
+            "scenario_label",
+            "num_pilots",
             "subcircuit_size",
+            "num_sub_circuits",
+            "num_subexperiments",
             "base_qubits",
             "observables",
             "scale_factor",
             "num_samples",
-            "metadata",
-            "cluster_config",
-            "full_circuit_qiskit_options",
-            "circuit_cutting_qiskit_options",
-            "circuit_cutting_task_resources",
-            "full_circuit_task_resources",
-            "find_cuts_time",
+            "actual_num_samples",
+            "find_cuts_time_secs",
+            "circuit_cutting_time_secs",
+            "avg_subcircuit_exec_time_secs",
             "circuit_cutting_reconstruct_time_secs",
             "circuit_cutting_total_runtime_secs",
             "full_circuit_transpile_time_secs",
@@ -353,8 +354,12 @@ class CircuitCutting(Motif):
             "circuit_cutting_expval",
             "full_circuit_expval",
             "error_in_estimation",
-            "scenario_label", 
-            "num_pilots"
+            "metadata",
+            "cluster_config",
+            "full_circuit_qiskit_options",
+            "circuit_cutting_qiskit_options",
+            "circuit_cutting_task_resources",
+            "full_circuit_task_resources"
         ]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
         # Create a logger
@@ -432,7 +437,7 @@ class CircuitCutting(Motif):
             f"Sampling overhead: {np.prod([basis.overhead for basis in partitioned_problem.bases])}"
         )
 
-        return subcircuits, subobservables, observable, circuit
+        return subcircuits, subobservables, observable, circuit, metadata
 
     def run_circuit_cutting(self, circuit, observable, circuit_cutting_qiskit_options):
         """
@@ -450,22 +455,30 @@ class CircuitCutting(Motif):
         """
         start_time = time.time()
         start_find_cuts = time.time()
-        subcircuits, subobservables, observable, circuit = (
+        subcircuits, subobservables, observable, circuit , metadata = (
             self.get_sub_circuit_observables(circuit, observable, self.num_samples)
         )
+        num_sub_circuits = len(subcircuits)
+        self.logger.info(f"Number of subcircuits generated: {num_sub_circuits}")
         end_find_cuts = time.time()
 
+        actual_num_samples = num_sub_circuits * (6 ** len(metadata["cuts"]))
+        self.logger.info(f"Actual number of samples: {actual_num_samples}")
+        
         subexperiments_generation_start_time = time.time()
         subexperiments, coefficients = generate_cutting_experiments(
             circuits=subcircuits, observables=subobservables, num_samples=self.num_samples
         )           
         subexperiments_generation_end_time = time.time()
         subexperiments_generation_time_secs = subexperiments_generation_end_time - subexperiments_generation_start_time
+        num_subexperiments = sum(len(subexperiment_list) for subexperiment_list in subexperiments.values())
         self.logger.info(f"Subexperiments generation time: {subexperiments_generation_time_secs}")
+        self.logger.info(f"Number of subexperiments generated: {num_subexperiments}")
 
         quantum_task_futures = {}
         quantum_tasks_submission_start_time = time.time()
         for label, subexperiment_list in subexperiments.items():
+            self.logger.info(f"submitting task for {label}, number of subexperiments: {len(subexperiment_list)}")
             quantum_task = QuantumTask(
                 circuits=subexperiment_list,  # Pass the entire list
                 resource_config=self.sub_circuit_task_resources
@@ -478,7 +491,7 @@ class CircuitCutting(Motif):
         self.logger.info(f"Quantum tasks submission time: {quantum_tasks_submission_time_secs}")
 
         quantum_tasks_waiting_start_time = time.time()
-        self.executor.wait(quantum_task_futures.values())
+        self.executor.wait(list(quantum_task_futures.values()))
         quantum_tasks_waiting_end_time = time.time()
         quantum_tasks_waiting_time_secs = quantum_tasks_waiting_end_time - quantum_tasks_waiting_start_time
         self.logger.info(f"Quantum tasks waiting time: {quantum_tasks_waiting_time_secs}")
@@ -491,6 +504,13 @@ class CircuitCutting(Motif):
         quantum_tasks_results_end_time = time.time()
         quantum_tasks_results_time_secs = quantum_tasks_results_end_time - quantum_tasks_results_start_time
         self.logger.info(f"Quantum tasks results time: {quantum_tasks_results_time_secs}")
+
+        circuit_cutting_time_secs = quantum_tasks_results_end_time - quantum_tasks_submission_start_time
+        self.logger.info(f"Circuit cutting time: {circuit_cutting_time_secs}")
+        
+        # Calculate average subcircuit execution time
+        avg_subcircuit_exec_time_secs = circuit_cutting_time_secs / num_sub_circuits if num_sub_circuits > 0 else 0
+        self.logger.info(f"Average subcircuit execution time: {avg_subcircuit_exec_time_secs}")
 
         reconstruction_start_time = time.time()
         reconstructed_expval_terms = reconstruct_expectation_values(
@@ -507,9 +527,14 @@ class CircuitCutting(Motif):
 
 
         metrics =  {
-            'find_cuts_time': end_find_cuts - start_find_cuts,
+            'find_cuts_time_secs': end_find_cuts - start_find_cuts,
             'reconstruction_time': reconstruct_subcircuit_expectations_time_secs,
             'total_runtime': total_runtime_secs,
+            'num_sub_circuits': num_sub_circuits,
+            'num_subexperiments': num_subexperiments,
+            'circuit_cutting_time_secs': circuit_cutting_time_secs,
+            'avg_subcircuit_exec_time_secs': avg_subcircuit_exec_time_secs,
+            'actual_num_samples': actual_num_samples,
         }
 
         return reconstructed_expval, metrics
@@ -556,6 +581,15 @@ class CircuitCutting(Motif):
 
         # num_nodes attribute in task resource description in Ray
         ray_task_resources = {k: v for k, v in self.full_circuit_task_resources.items() if k != "num_nodes"}
+
+        exact_expval = run_full_circuit(observable, full_circuit_qiskit_options, full_circuit_transpilation)
+        self.logger.info(f"Exact expectation value: {exact_expval}")
+        estimator_time = time.time() - estimator_start
+        return exact_expval, {
+            'transpile_time': transpile_time,
+            'estimator_time': estimator_time,
+            'total_time': transpile_time + estimator_time
+        }
         
         if "mpi" not in full_circuit_qiskit_options or full_circuit_qiskit_options["mpi"] == False:
             # Execute the circuit without
@@ -669,16 +703,20 @@ class CircuitCutting(Motif):
                 return
 
             # Store metrics for later use
-            circuit_cutting_find_cuts_time_secs = metrics['find_cuts_time']
+            circuit_cutting_find_cuts_time_secs = metrics['find_cuts_time_secs']
             circuit_cutting_reconstruct_subcircuit_expectations_time_secs = metrics['reconstruction_time']
             circuit_cutting_total_runtime_secs = metrics['total_runtime']
-
+            num_sub_circuits = metrics['num_sub_circuits']
+            num_subexperiments = metrics['num_subexperiments']
+            circuit_cutting_time_secs = metrics['circuit_cutting_time_secs']
+            avg_subcircuit_exec_time_secs = metrics['avg_subcircuit_exec_time_secs']
+            actual_num_samples = metrics['actual_num_samples']
         if self.circuit_cutting_only == False: # Run full circuit simulation
             exact_expval, full_metrics = self.run_full_circuit_simulation(circuit, observable, full_circuit_qiskit_options)
 
             # Store full circuit metrics analogously
             full_circuit_transpile_time_secs = full_metrics['transpile_time']
-            full_circuit_exec_time_sec = full_metrics['estimator_time']
+            full_circuit_exec_time_secs = full_metrics['estimator_time']
             full_circuit_total_runtime_secs = full_metrics['total_time']
 
 
@@ -694,28 +732,33 @@ class CircuitCutting(Motif):
         self.metrics_file_writer.write(
             [
                 getattr(self, "experiment_start_time", None),
+                self.scenario_label,
+                len(self.executor.pilots),
                 getattr(self, "subcircuit_size", None),
+                num_sub_circuits if 'num_sub_circuits' in locals() else None,
+                num_subexperiments if 'num_subexperiments' in locals() else None,
                 getattr(self, "base_qubits", None),
                 getattr(self, "observables", None),
                 getattr(self, "scale_factor", None),
                 getattr(self, "num_samples", None),
+                actual_num_samples if 'actual_num_samples' in locals() else None,
+                circuit_cutting_find_cuts_time_secs if 'circuit_cutting_find_cuts_time_secs' in locals() else None,
+                circuit_cutting_time_secs if 'circuit_cutting_time_secs' in locals() else None,
+                avg_subcircuit_exec_time_secs if 'avg_subcircuit_exec_time_secs' in locals() else None,
+                circuit_cutting_reconstruct_subcircuit_expectations_time_secs if 'circuit_cutting_reconstruct_subcircuit_expectations_time_secs' in locals() else None,
+                circuit_cutting_total_runtime_secs if 'circuit_cutting_total_runtime_secs' in locals() else None,                
+                full_circuit_transpile_time_secs if 'full_circuit_transpile_time_secs' in locals() else None,
+                full_circuit_exec_time_secs if 'full_circuit_exec_time_secs' in locals() else None,
+                full_circuit_total_runtime_secs if 'full_circuit_total_runtime_secs' in locals() else None,
+                final_expval if 'final_expval' in locals() else None,
+                exact_expval if 'exact_expval' in locals() else None,
+                float(error_in_estimation) if 'error_in_estimation' in locals() else None,
                 str(self.metadata) if hasattr(self, "metadata") else None,
                 str(self.executor.cluster_config) if hasattr(self.executor, "cluster_config") else None,
                 str(self.full_circuit_qiskit_options) if hasattr(self, "full_circuit_qiskit_options") else None,
                 str(self.circuit_cutting_qiskit_options) if hasattr(self, "circuit_cutting_qiskit_options") else None,
                 str(self.sub_circuit_task_resources) if hasattr(self, "sub_circuit_task_resources") else None,
-                str(self.full_circuit_task_resources) if hasattr(self, "full_circuit_task_resources") else None,
-                circuit_cutting_find_cuts_time_secs if 'circuit_cutting_find_cuts_time_secs' in locals() else None,
-                circuit_cutting_reconstruct_subcircuit_expectations_time_secs if 'circuit_cutting_reconstruct_subcircuit_expectations_time_secs' in locals() else None,
-                circuit_cutting_total_runtime_secs if 'circuit_cutting_total_runtime_secs' in locals() else None,
-                full_circuit_transpile_time_secs if 'full_circuit_transpile_time_secs' in locals() else None,
-                full_circuit_exec_time_sec if 'full_circuit_exec_time_sec' in locals() else None,
-                full_circuit_total_runtime_secs if 'full_circuit_total_runtime_secs' in locals() else None,
-                final_expval if 'final_expval' in locals() else None,
-                exact_expval if 'exact_expval' in locals() else None,
-                float(error_in_estimation) if 'error_in_estimation' in locals() else None,
-                self.scenario_label,
-                len(self.executor.pilots)
+                str(self.full_circuit_task_resources) if hasattr(self, "full_circuit_task_resources") else None
             ]
         )
 

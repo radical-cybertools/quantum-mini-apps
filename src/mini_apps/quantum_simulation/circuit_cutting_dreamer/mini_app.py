@@ -33,7 +33,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Define benchmark configurations at the top
 BENCHMARK_CONFIG = {
-    'num_runs': 3,
+    'num_runs': 1,
     'num_pilots': 1,  # Number of pilots to create
     'hardware_configs': [
         {
@@ -44,9 +44,9 @@ BENCHMARK_CONFIG = {
     ],
     'circuit_configs': [
         {
-            'qubit_sizes': [30],
-            'subcircuit_sizes': [12, 10, 8, 6, 4, 2],  # 30//4 + 1
-            'num_samples': 1000
+            'qubit_sizes': [34],
+            'subcircuit_sizes': [6, 4, 2],  # 30//4 + 1
+            'num_samples': 5000
         }
     ]
 }
@@ -108,7 +108,7 @@ def create_cluster_info(nodes, cores, gpus, num_pilots=2):
         "working_directory": WORKING_DIRECTORY,
         "type": "ray",
         "number_of_nodes": nodes,
-        "cores_per_node": int(cores/num_pilots),
+        "cores_per_node": int(cores),
         "gpus_per_node": gpus,
         "QPUs": 1,
         "resource_type": "quantum",
@@ -219,13 +219,13 @@ def create_cc_parameters(circuit_size, subcircuit_size, num_samples, num_nodes, 
             "QPU": 1,
         },
         FULL_CIRCUIT_TASK_RESOURCES: {
-            "num_cpus": 1,
+            "num_cpus": 16,
             "num_gpus": num_gpus,
             "num_nodes": num_nodes,
             "memory": None,
         },
-        FULL_CIRCUIT_ONLY: False,
-        CIRCUIT_CUTTING_ONLY: True,
+        FULL_CIRCUIT_ONLY: True,
+        CIRCUIT_CUTTING_ONLY: False,
         CIRCUIT_CUTTING_SIMULATOR_BACKEND_OPTIONS: {
             "backend_options": {"shots": 4096, "device":"CPU", "method":"statevector"},
             # "backend_options": {"device":"GPU", "method":"statevector", "shots": 4096,
@@ -235,11 +235,11 @@ def create_cc_parameters(circuit_size, subcircuit_size, num_samples, num_nodes, 
         },
         DREAMER_STRATEGY: DreamerStrategyType.ROUND_ROBIN,
         FULL_CIRCUIT_SIMULATOR_BACKEND_OPTIONS: {
-            #"backend_options": {"shots": 4096, "device":"CPU", "method":"statevector"},
-            "backend_options": {"device":"GPU", "method":"statevector", "shots": 4096,
-                              "blocking_enable":True, "batched_shots_gpu":True, 
-                              "blocking_qubits":23},
-            "mpi": True
+            "backend_options": {"shots": 4096, "device":"CPU", "method":"statevector"},
+            # "backend_options": {"device":"GPU", "method":"statevector", "shots": 4096,
+            #                   "blocking_enable":True, "batched_shots_gpu":True, 
+            #                   "blocking_qubits":23},
+            "mpi": False
         },
         SCENARIO_LABEL: f"circuit_size_{circuit_size}_subcircuit_{subcircuit_size}_samples_{num_samples}_cores_{num_cores}_nvidia_80GB"
     }
@@ -248,7 +248,7 @@ def run_mini_app_benchmark():
     for run_idx in range(BENCHMARK_CONFIG['num_runs']):
         logger.info(f"Starting benchmark run {run_idx + 1}/{BENCHMARK_CONFIG['num_runs']}")
         
-        for num_pilots in range(1, 2):
+        for num_pilots in range(1, BENCHMARK_CONFIG['num_pilots'] + 1):
             for hw_config in BENCHMARK_CONFIG['hardware_configs']:
                 for nodes in hw_config['nodes']:
                     for gpus in hw_config['gpus_per_node']:
