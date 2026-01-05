@@ -6,3 +6,9 @@
 **/*.csv
 .vscode/
 slurm_output
+uv.lock
+.cursor/
+.claude/
+
+# QDreamer results directory (experimental data and analysis)
+src/mini_apps/quantum_simulation/circuit_cutting/qdreamer/results/

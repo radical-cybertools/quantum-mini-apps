@@ -28,11 +28,36 @@ To get started with the Quantum Mini-Apps framework, follow these steps:
 git clone https://github.com/radical-cybertools/quantum-mini-apps.git
 ```
 
-2. Install the required dependencies and framework defined in ```pyproject.toml``` in Conda/Python env:
-```
-cd quantum-mini-apps
-pip install --update .
-```
+2. Install the required dependencies and framework defined in ```pyproject.toml``` in Python env:
+
+   **Using pip:**
+   ```bash
+   cd quantum-mini-apps
+   # Optional: create and activate virtual environment with Python 3.12
+   python3.12 -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   
+   pip install --upgrade .
+   ```
+
+   **Using uv (faster alternative):**
+   ```bash
+   cd quantum-mini-apps
+   # uv can create and manage the venv automatically with Python 3.12
+   uv venv --python 3.12  # Creates .venv directory
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   
+   uv pip install --upgrade .
+   ```
+
+   **Note:** For GPU support (qiskit-aer-gpu), install with the `gpu` extra:
+   ```bash
+   # With pip
+   pip install --upgrade .[gpu]
+   
+   # With uv
+   uv pip install --upgrade .[gpu]
+   ```
 
 3. Set PYTHONPATH for easier debugging:
 

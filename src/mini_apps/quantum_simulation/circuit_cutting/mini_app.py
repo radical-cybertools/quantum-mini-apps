@@ -35,15 +35,15 @@ BENCHMARK_CONFIG = {
     'hardware_configs': [
         {
             'nodes': [1],
-            'cores_per_node': 1,
-            'gpus_per_node': [1]
+            'cores_per_node': 64,
+            'gpus_per_node': [4]
         }
     ],
     'circuit_configs': [
         {
-            'qubit_sizes': [34],
-            'subcircuit_sizes': [17, 12],  # 30//4 + 1
-            'num_samples': 1000
+            'qubit_sizes': [33],
+            'subcircuit_sizes': [17],  # 30//4 + 1
+            'num_samples': 10000
         }
     ]
 }
@@ -124,6 +124,9 @@ def create_cluster_info_perlmutter(nodes, cores=128, gpus=4):
         }
 
 def create_cc_parameters(circuit_size, subcircuit_size, num_samples, num_nodes, num_cores, num_gpus):
+    # Determine if we're using MPI for full circuit simulation
+    use_mpi_full_circuit = False  # Set based on your needs
+
     return {
         SUBCIRCUIT_SIZE: subcircuit_size,
         BASE_QUBITS: circuit_size,
@@ -136,28 +139,35 @@ def create_cc_parameters(circuit_size, subcircuit_size, num_samples, num_nodes, 
             "memory": None,
         },
         FULL_CIRCUIT_TASK_RESOURCES: {
-            "num_cpus": 1,
-            "num_gpus": num_gpus,
+            "num_cpus": num_gpus,
+            # If using MPI, set num_gpus to 0 (srun manages GPUs via CUDA_VISIBLE_DEVICES)
+            # Otherwise, Ray needs to allocate GPUs for the task to access them
+            "num_gpus": 0 if use_mpi_full_circuit else num_gpus,
+            "mpi_ranks": num_gpus,
             "num_nodes": num_nodes,
             "memory": None,
         },
         FULL_CIRCUIT_ONLY: False,
-        CIRCUIT_CUTTING_ONLY: True,
+        CIRCUIT_CUTTING_ONLY: False,
         CIRCUIT_CUTTING_SIMULATOR_BACKEND_OPTIONS: {
             #"backend_options": {"shots": 4096, "device":"CPU", "method":"statevector"},
             "backend_options": {"device":"GPU", "method":"statevector", "shots": 4096,
-                              "blocking_enable":True, "batched_shots_gpu":True, 
+                              "blocking_enable":True, "batched_shots_gpu":True,
                               "blocking_qubits":23},
             "mpi": False
         },
         FULL_CIRCUIT_SIMULATOR_BACKEND_OPTIONS: {
             #"backend_options": {"shots": 4096, "device":"CPU", "method":"statevector"},
             "backend_options": {"device":"GPU", "method":"statevector", "shots": 4096,
-                              "blocking_enable":True, "batched_shots_gpu":True, 
-                              "blocking_qubits":23},
-            "mpi": True
+                              #"precision": "single",  # Use FP32 to reduce memory
+                              "blocking_enable": True,
+                              "batched_shots_gpu": True,
+                              "blocking_qubits": 29,  
+                              "cuStateVec_enable": True  # Enable multi-GPU
+                              },
+            "mpi": use_mpi_full_circuit
         },
-        SCENARIO_LABEL: f"circuit_size_{circuit_size}_subcircuit_{subcircuit_size}_samples_{num_samples}_cores_{num_cores}_nvidia_80GB"
+        SCENARIO_LABEL: f"circuit_size_{circuit_size}_subcircuit_{subcircuit_size}_samples_{num_samples}_cores_{num_cores}_nvidia_A100"
     }
 
 def run_mini_app_benchmark():
@@ -167,7 +177,7 @@ def run_mini_app_benchmark():
         for hw_config in BENCHMARK_CONFIG['hardware_configs']:
             for nodes in hw_config['nodes']:
                 for gpus in hw_config['gpus_per_node']:
-                    cluster_info = create_cluster_info_perlmutter(
+                    cluster_info = create_cluster_info(
                         nodes=nodes,
                         cores=hw_config['cores_per_node'],
                         gpus=gpus
@@ -195,10 +205,13 @@ def run_mini_app_benchmark():
                                     logger.error(f"Error in configuration {cc_parameters[SCENARIO_LABEL]}: {e}")
                                     raise e
 
+# Module-level constants for resource configuration
+# These can be overridden by setting environment variables or modifying before import
+RESOURCE_URL_HPC = os.environ.get("RESOURCE_URL_HPC", "slurm://localhost")
+RESOURCE_URL_LOCAL = os.environ.get("RESOURCE_URL_LOCAL", "ssh://localhost")
+WORKING_DIRECTORY = os.environ.get("WORKING_DIRECTORY", os.path.join(os.environ.get("HOME", "/tmp"), "work"))
+
 if __name__ == "__main__":
-    RESOURCE_URL_HPC = "slurm://localhost"
-    RESOURCE_URL_LOCAL = "ssh://localhost"
-    WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 
     # Create a logger
     logger = logging.getLogger(__name__)

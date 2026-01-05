@@ -8,8 +8,6 @@ sys.path.insert(0, "/opt/udiImage/modules/mpich")
 sys.path.insert(0, "/opt/udiImage/modules/gpu/lib64")
 print(str(sys.path))
 
-# os.environ["LD_LIBRARY_PATH"] = "/opt/conda/envs/cuquantum-24.08/lib"
-# os.system("printenv LD_LIBRARY_PATH")
 
 from qiskit import QuantumCircuit, transpile
 from qiskit_aer import Aer

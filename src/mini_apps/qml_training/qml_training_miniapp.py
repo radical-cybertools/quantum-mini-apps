@@ -135,7 +135,7 @@ if __name__ == "__main__":
                         "queue": "debug",
                         "walltime": 30,            
                         "project": "m4408",
-                        "conda_environment": "/pscratch/sd/l/luckow/conda/quantum-mini-apps-qml",
+                        "conda_environment": "",
                         "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
                     }
                 }

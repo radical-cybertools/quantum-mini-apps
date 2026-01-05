@@ -7,19 +7,75 @@ from engine.cluster.base_executor import Executor
 from engine.cluster.dask_executor import DaskExecutor   
 import psutil
 import subprocess
+import functools
 
 
 
 
 class PilotQuantumExecutor(Executor):
 
-    
+    # Default excludes for Ray runtime environment to avoid uploading large files
+    _default_ray_excludes = [
+        ".git/**",
+        ".git/lfs/**",
+        ".venv/**",
+        "__pycache__/**",
+        "*.npy",
+        "*.csv",
+        ".idea/**",
+        ".vscode/**",
+        "slurm_output/**",
+        "*.pyc",
+        "*.pyo",
+        "*.pyd",
+        ".pytest_cache/**",
+        "*.egg-info/**",
+        "dist/**",
+        "build/**",
+        "*.so",
+        "*.dylib",
+        "*.dll",
+    ]
 
     def __init__(self, cluster_config=None):
         super().__init__()
         self.cluster_config = cluster_config or {}
         self.type = self.cluster_config["config"]["type"]
+        
+        # Patch ray.init to add excludes if using Ray
+        if self.type == "ray":
+            self._patch_ray_init()
+        
         self.pilot, self.client = self.initialize_client(self.cluster_config["config"])
+
+    def _patch_ray_init(self):
+        """Patch ray.init to automatically add excludes for large files."""
+        original_ray_init = ray.init
+        
+        @functools.wraps(original_ray_init)
+        def patched_ray_init(*args, **kwargs):
+            # Get excludes from cluster_config or use defaults
+            excludes = self.cluster_config.get("config", {}).get("runtime_env", {}).get("excludes", self._default_ray_excludes)
+            
+            # Merge excludes into runtime_env
+            if "runtime_env" not in kwargs:
+                kwargs["runtime_env"] = {}
+            elif kwargs["runtime_env"] is None:
+                kwargs["runtime_env"] = {}
+            
+            # Merge excludes, avoiding duplicates
+            existing_excludes = kwargs["runtime_env"].get("excludes", [])
+            if isinstance(existing_excludes, list):
+                combined_excludes = list(set(existing_excludes + excludes))
+            else:
+                combined_excludes = excludes
+            
+            kwargs["runtime_env"]["excludes"] = combined_excludes
+            
+            return original_ray_init(*args, **kwargs)
+        
+        # Replace ray.init with our patched version
+        ray.init = patched_ray_init
 
     def initialize_client(self, cluster_config):
         pilot_compute_description = cluster_config

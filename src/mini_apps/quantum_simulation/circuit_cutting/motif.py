@@ -73,15 +73,69 @@ DEFAULT_SIMULATOR_BACKEND_OPTIONS = {
 }
 
 ##################################################################################################
+# Helper Functions
+
+def log_subexperiment_characteristics(logger, task_id, label, circuit, stage="SUBMIT"):
+    """
+    Log circuit characteristics for straggler analysis.
+
+    Args:
+        logger: Logger instance
+        task_id: Task identifier
+        label: Subsystem label (e.g., 'A', 'B', 'C')
+        circuit: Qiskit QuantumCircuit object
+        stage: Logging stage ('SUBMIT' or 'EXEC')
+    """
+    from qiskit.converters import circuit_to_dag
+
+    two_q_gates = len(circuit_to_dag(circuit).two_qubit_ops())
+    gate_counts = circuit.count_ops()
+
+    logger.info(
+        f"[SUBEXPT_{stage}] "
+        f"task_id={task_id}, "
+        f"label={label}, "
+        f"qubits={circuit.num_qubits}, "
+        f"depth={circuit.depth()}, "
+        f"total_gates={circuit.size()}, "
+        f"two_q_gates={two_q_gates}, "
+        f"cx_gates={gate_counts.get('cx', 0)}, "
+        f"gate_types={dict(gate_counts)}"
+    )
+
+
+##################################################################################################
 # Called from distributed executor, e.g., Ray or MPI
 
 # Circuit Cutting Simulation
-def execute_sampler(backend_options, label, subsystem_subexpts, shots):
+def execute_sampler(backend_options, label, subsystem_subexpts, 
+                    shots, num_threads=1):
     # Add error handling
-    try:
+    try: 
         from qiskit_aer import AerSimulator
+        from qiskit.converters import circuit_to_dag
+
+        task_start_time = time.time()  # Track total task time
+
+        # Log circuit characteristics when execution starts
+        circuit = subsystem_subexpts[0]
+        two_q_gates = len(circuit_to_dag(circuit).two_qubit_ops())
+
+        print(f"[SUBEXPT_EXEC_START] "
+              f"label={label}, "
+              f"threads={num_threads}, "
+              f"qubits={circuit.num_qubits}, "
+              f"depth={circuit.depth()}, "
+              f"total_gates={circuit.size()}, "
+              f"two_q_gates={two_q_gates}, "
+              f"device={backend_options['backend_options'].get('device', 'N/A')}, "
+              f"shots={shots}")
+
         submit_start = time.time()
-        backend = AerSimulator(**backend_options["backend_options"])
+        # Configure Aer to use multiple threads
+        backend_opts = backend_options["backend_options"].copy()
+        backend_opts["max_parallel_threads"] = num_threads
+        backend = AerSimulator(**backend_opts)
 
         with Batch(backend=backend) as batch:
             sampler = SamplerV2(mode=batch)
@@ -159,33 +213,44 @@ def execute_sampler(backend_options, label, subsystem_subexpts, shots):
                 new_results, metadata=copy.deepcopy(result.metadata)
             )
 
+            task_end_time = time.time()
+            total_task_time = task_end_time - task_start_time
+
             print(
-                f"Job {label} completed with job id {job.job_id()}, submit_time: {submit_end-submit_start} and execution_time: {result_end - result_start}, type: {type(new_result)}"
+                f"Job {label} completed with job id {job.job_id()}, "
+                f"submit_time: {submit_end-submit_start:.3f}s, "
+                f"execution_time: {result_end - result_start:.3f}s, "
+                f"total_task_time: {total_task_time:.3f}s, "
+                f"type: {type(new_result)}"
             )
-            return (label, new_result)
+            return (label, new_result, total_task_time)
     except Exception as e:
         logging.error(f"Error executing sampler: {str(e)}")
         return None  # Return None explicitly when there's an error
 
 
 # Full Circuit Simulation
-def run_full_circuit(observable, backend_options, full_circuit):
+def run_full_circuit(observable, backend_options, full_circuit, num_threads=1):
     try:
         from qiskit_aer.primitives import EstimatorV2
         from qiskit_aer import AerSimulator
-        
+
+        # Configure Aer to use multiple threads
+        backend_opts = backend_options["backend_options"].copy()
+        backend_opts["max_parallel_threads"] = num_threads
+
         # Create simulator
-        simulator = AerSimulator(**backend_options["backend_options"])
-        
+        simulator = AerSimulator(**backend_opts)
+
         # Create estimator using the simulator
         estimator = EstimatorV2.from_backend(simulator)
-        
+
         # Run estimation
         result = estimator.run([(full_circuit, observable)])
         exact_expval = result.result()[0].data.evs
-        
+
         return exact_expval
-        
+
     except Exception as e:
         logging.error(f"Unexpected error in full circuit simulation: {str(e)}")
         return str(e)
@@ -239,7 +304,7 @@ def cli_run_full_circuit(
 
 
 
-#####################################################################################################
+################################################################################
 
 class CircuitCuttingBuilder:
     """
@@ -314,6 +379,46 @@ class CircuitCuttingBuilder:
         self.num_samples = 10
         self.sub_circuit_task_resources = {"num_cpus": 1, "num_gpus": 0, "memory": None}
         self.full_circuit_task_resources = {"num_cpus": 1, "num_gpus": 0, "memory": None}
+        self.max_parallel_tasks = None  # Optional limit from QDreamer
+        self.gpu_mode = False  # Track if GPU acceleration is enabled
+        self.gpu_fraction = None  # Track GPU fraction per task
+        self.gpu_type = None  # Track GPU type (e.g., 'B200', 'H100', 'A100')
+        self.custom_circuit = None  # Optional: pre-generated circuit to use instead of generating one
+        self.default_circuit_depth = 2  # Default circuit depth (reps) for EfficientSU2
+        # Parallelization configuration tracking (for CSV output)
+        self.num_nodes = None
+        self.cores_per_node = None
+        self.gpus_per_node = None
+        self.result_file = None  # Optional: CSV file to write results
+        self.scenario_label = None  # Optional: label for the scenario
+
+    def set_circuit(self, circuit):
+        """
+        Set a pre-generated circuit to use instead of generating a new one.
+        This ensures the same circuit is used for both QDreamer optimization and actual execution.
+        
+        Args:
+            circuit: QuantumCircuit object to use
+            
+        Returns:
+            CircuitCuttingBuilder: self for method chaining
+        """
+        self.custom_circuit = circuit
+        return self
+
+    def set_circuit_depth(self, circuit_depth):
+        """
+        Set the circuit depth (reps) for EfficientSU2 circuit generation.
+        Only used when no custom circuit is provided.
+        
+        Args:
+            circuit_depth: Number of repetitions/layers for EfficientSU2 circuit (default: 2)
+            
+        Returns:
+            CircuitCuttingBuilder: self for method chaining
+        """
+        self.default_circuit_depth = circuit_depth
+        return self
 
     def set_subcircuit_size(self, subcircuit_size):
         self.subcircuit_size = subcircuit_size
@@ -367,6 +472,46 @@ class CircuitCuttingBuilder:
         self.scenario_label = scenario_label
         return self
 
+    def set_max_parallel_tasks(self, max_parallel_tasks):
+        """Set maximum number of parallel tasks (e.g., from QDreamer optimization)"""
+        self.max_parallel_tasks = max_parallel_tasks
+        return self
+
+    def set_qdreamer_allocation(self, allocation):
+        """Optional: Set QDreamer allocation for prediction tracking in CSV output"""
+        self.qdreamer_allocation = allocation
+        return self
+
+    def set_gpu_mode(self, gpu_mode):
+        """Set GPU mode flag for tracking in CSV output"""
+        self.gpu_mode = gpu_mode
+        return self
+
+    def set_gpu_fraction(self, gpu_fraction):
+        """Set GPU fraction per task for tracking in CSV output"""
+        self.gpu_fraction = gpu_fraction
+        return self
+
+    def set_gpu_type(self, gpu_type):
+        """Set GPU type (e.g., 'B200', 'H100', 'A100') for tracking in CSV output"""
+        self.gpu_type = gpu_type
+        return self
+
+    def set_num_nodes(self, num_nodes):
+        """Set number of nodes in the cluster for CSV tracking"""
+        self.num_nodes = num_nodes
+        return self
+
+    def set_cores_per_node(self, cores_per_node):
+        """Set number of CPU cores per node for CSV tracking"""
+        self.cores_per_node = cores_per_node
+        return self
+
+    def set_gpus_per_node(self, gpus_per_node):
+        """Set number of GPUs per node for CSV tracking"""
+        self.gpus_per_node = gpus_per_node
+        return self
+
     def build(self, executor):
         return CircuitCutting(
             executor,
@@ -382,7 +527,17 @@ class CircuitCuttingBuilder:
             self.circuit_cutting_only,
             self.result_file,
             self.num_samples,
-            self.scenario_label
+            self.scenario_label,
+            self.max_parallel_tasks,
+            getattr(self, 'qdreamer_allocation', None),  # Optional: None if not set
+            self.gpu_mode,
+            self.gpu_fraction,
+            self.gpu_type,
+            getattr(self, 'custom_circuit', None),  # Pass custom circuit if set
+            self.num_nodes,
+            self.cores_per_node,
+            self.gpus_per_node,
+            self.default_circuit_depth
         )
 
 
@@ -403,7 +558,17 @@ class CircuitCutting(Motif):
         circuit_cutting_only,
         result_file,
         num_samples,
-        scenario_label
+        scenario_label,
+        max_parallel_tasks=None,
+        qdreamer_allocation=None,
+        gpu_mode=False,
+        gpu_fraction=None,
+        gpu_type=None,
+        custom_circuit=None,
+        num_nodes=None,
+        cores_per_node=None,
+        gpus_per_node=None,
+        default_circuit_depth=2
     ):
         super().__init__(executor, base_qubits)
         self.subcircuit_size = subcircuit_size
@@ -419,13 +584,27 @@ class CircuitCutting(Motif):
         self.full_circuit_task_resources = full_circuit_task_resources
         self.full_circuit_only = full_circuit_only
         self.circuit_cutting_only = circuit_cutting_only
-       
+
         self.scenario_label = scenario_label
+        self.max_parallel_tasks = max_parallel_tasks  # Optional limit from QDreamer
+        self.qdreamer_allocation = qdreamer_allocation  # Optional QDreamer predictions
+        self.gpu_mode = gpu_mode  # Track if GPU acceleration is enabled
+        self.gpu_fraction = gpu_fraction  # Track GPU fraction per task
+        self.gpu_type = gpu_type  # Track GPU type (e.g., 'B200', 'H100', 'A100')
+        self.custom_circuit = custom_circuit  # Optional: pre-generated circuit to use (ensures same as QDreamer)
+        self.default_circuit_depth = default_circuit_depth  # Circuit depth (reps) for default EfficientSU2
+        # Parallelization configuration tracking
+        self.num_nodes = num_nodes
+        self.cores_per_node = cores_per_node
+        self.gpus_per_node = gpus_per_node
         self.metadata = None
+
         header = [
             "experiment_start_time",
             "subcircuit_size",
             "base_qubits",
+            "circuit_type",
+            "circuit_depth",
             "observables",
             "scale_factor",
             "num_samples",
@@ -447,7 +626,28 @@ class CircuitCutting(Motif):
             "circuit_cutting_expval",
             "full_circuit_expval",
             "error_in_estimation",
-            "scenario_label"
+            "scenario_label",
+            # QDreamer prediction columns (optional, empty if QDreamer not used)
+            "num_cuts",
+            "sampling_overhead",
+            "predicted_speedup",
+            "actual_speedup",
+            "speedup_error",
+            "prediction_accuracy_pct",
+            # GPU configuration tracking
+            "gpu_mode",
+            "gpu_fraction",
+            "gpu_type",
+            "num_slots",
+            # Cut type tracking
+            "num_gate_cuts",
+            "num_wire_cuts",
+            # Parallelization configuration
+            "num_nodes",
+            "cores_per_node",
+            "gpus_per_node",
+            # Task runtime tracking
+            "task_runtimes"
         ]
         self.metrics_file_writer = MetricsFileWriter(self.result_file, header)
         # Create a logger
@@ -490,7 +690,13 @@ class CircuitCutting(Motif):
                   original observable, and circuit
         """
         # Specify settings for the cut-finding optimizer
-        optimization_settings = OptimizationParameters(seed=111)
+        # CRITICAL: Use the same seed as QDreamer if available, otherwise default to 111
+        if hasattr(self, 'qdreamer_allocation') and self.qdreamer_allocation is not None:
+            # Try to get seed from QDreamer allocation metadata if available
+            seed = self.qdreamer_allocation.metadata.get('optimization_seed', 111) if hasattr(self.qdreamer_allocation, 'metadata') else 111
+        else:
+            seed = 111
+        optimization_settings = OptimizationParameters(seed=seed)
 
         # Specify the size of the QPUs available
         device_constraints = DeviceConstraints(
@@ -501,6 +707,17 @@ class CircuitCutting(Motif):
             circuit, optimization_settings, device_constraints
         )
         self.metadata = metadata
+        
+        # Parse and count gate cuts vs wire cuts
+        self.num_gate_cuts = 0
+        self.num_wire_cuts = 0
+        if metadata and "cuts" in metadata:
+            for cut in metadata["cuts"]:
+                cut_type = cut[0] if isinstance(cut, tuple) else str(cut)
+                if "Gate" in cut_type or "gate" in cut_type:
+                    self.num_gate_cuts += 1
+                elif "Wire" in cut_type or "wire" in cut_type:
+                    self.num_wire_cuts += 1
 
         self.logger.info(
             f"Full circuit size: {len(circuit.qubits)} \n"
@@ -583,6 +800,12 @@ class CircuitCutting(Motif):
         sub_circuit_execution_time = time.time()
         resources = copy.copy(self.sub_circuit_task_resources)
 
+        # Remove None values and non-Ray options from resources dict
+        # num_threads is a custom field for execute_sampler, not a Ray option
+        resources = {k: v for k, v in resources.items()
+                     if v is not None and k not in ["num_threads"]}
+
+        self.logger.info(f"[TASK RESOURCES] Filtered resources dict passed to Ray: {resources}")
         self.logger.info(
             f"********************** len of subexperiments {len(isa_subexperiments)}********************"
         )
@@ -593,94 +816,253 @@ class CircuitCutting(Motif):
         number_of_tasks = 0
 
         # calculate the number of GPUs available
-        if self.sub_circuit_task_resources["num_gpus"] > 0:
-            num_slots = self.executor.cluster_config["config"]["gpus_per_node"]*self.executor.cluster_config["config"]["number_of_nodes"]
-        else:
-            num_slots = self.executor.cluster_config["config"]["number_of_nodes"]* self.executor.cluster_config["config"]["cores_per_node"]
+        # Safely access cluster config with fallbacks
+        try:
+            config = self.executor.cluster_config.get("config", {})
+            gpus_per_node = config.get("gpus_per_node", 0)
+            cores_per_node = config.get("cores_per_node", 1)
+            number_of_nodes = config.get("number_of_nodes", 1)
 
-        # Oversubscribe the number of slots
-        num_slots = num_slots * 2
+            # Log the configuration for debugging
+            self.logger.info(f"[DEBUG] Task resource configuration:")
+            self.logger.info(f"  sub_circuit_task_resources: {self.sub_circuit_task_resources}")
+            self.logger.info(f"  gpus_per_node: {gpus_per_node}")
+            self.logger.info(f"  cores_per_node: {cores_per_node}")
+            self.logger.info(f"  number_of_nodes: {number_of_nodes}")
 
-        self.logger.info(f"Number of slots available: {num_slots}")
+            # Check if tasks are actually requesting GPUs AND GPUs are available in cluster
+            if self.sub_circuit_task_resources.get("num_gpus", 0) > 0 and gpus_per_node > 0:
+                num_slots = gpus_per_node * number_of_nodes
+                self.logger.info(f"  Using GPU-based parallelism: {num_slots} GPU slots")
+            else:
+                num_slots = number_of_nodes * cores_per_node
+                self.logger.info(f"  Using CPU-based parallelism: {num_slots} CPU slots")
+        except (AttributeError, KeyError, TypeError) as e:
+            self.logger.warning(f"Could not determine num_slots from executor config: {e}")
+            # Fallback: use reasonable default based on requested resources
+            if self.sub_circuit_task_resources.get("num_gpus", 0) > 0:
+                num_slots = 1  # At least 1 GPU slot
+                self.logger.warning(f"  Fallback: Using 1 GPU slot")
+            else:
+                num_slots = max(1, self.sub_circuit_task_resources.get("num_cpus", 1))
+                self.logger.warning(f"  Fallback: Using {num_slots} CPU slot(s)")
+
+        # Don't oversubscribe to avoid OOM - keep 1:1 with GPUs
+        # num_slots = num_slots * 2
+
+        # Validate num_slots
+        if num_slots == 0:
+            try:
+                error_msg = (
+                    f"Invalid configuration: num_slots=0. "
+                    f"Config: gpus_per_node={config.get('gpus_per_node', 'N/A')}, "
+                    f"cores_per_node={config.get('cores_per_node', 'N/A')}, "
+                    f"number_of_nodes={config.get('number_of_nodes', 'N/A')}"
+                )
+            except:
+                error_msg = f"Invalid configuration: num_slots=0 (config unavailable)"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        # Apply QDreamer's max_parallel_tasks recommendation if provided
+        if self.max_parallel_tasks is not None:
+            original_num_slots = num_slots
+            num_slots = min(num_slots, self.max_parallel_tasks)
+            if original_num_slots != num_slots:
+                self.logger.info(
+                    f"[QDREAMER] Limiting parallelism from {original_num_slots} to {num_slots} "
+                    f"based on QDreamer optimization"
+                )
+
+        self.logger.info(f"[FINAL] Number of slots available for parallel execution: {num_slots}")
+        self.logger.info(f"[FINAL] Each task will use: {self.sub_circuit_task_resources}")
         
+        # Store num_slots for CSV output
+        self.num_slots = num_slots
+
+        # FLATTENED APPROACH: Combine all experiments from all subsystems into a single queue
+        # This allows full parallelization across ALL experiments (not just within each subsystem)
+        self.logger.info("=" * 80)
+        self.logger.info("FLATTENING experiments from all subsystems for parallel execution")
+        self.logger.info(f"Number of subsystems: {len(isa_subexperiments)}")
+
+        # RAY DIAGNOSTICS: Check Ray's view of available resources
+        try:
+            import ray
+            ray_resources = ray.available_resources()
+            self.logger.info(f"[RAY DIAGNOSTICS] Available resources from Ray: {ray_resources}")
+            self.logger.info(f"[RAY DIAGNOSTICS] Cluster resources: {ray.cluster_resources()}")
+        except Exception as e:
+            self.logger.warning(f"Could not get Ray diagnostics: {e}")
+
+        all_experiments = []
         for label, subsystem_subexpts in isa_subexperiments.items():
-            self.logger.info(
-                f"*************** len of subsystem_subexpts {len(subsystem_subexpts)}**********"
-            )
-            # Create a queue of all experiments that need to be run
-            experiment_queue = [(label, ss) for ss in subsystem_subexpts]
+            num_expts = len(subsystem_subexpts)
+            self.logger.info(f"  Subsystem '{label}': {num_expts} subexperiments")
+            for ss in subsystem_subexpts:
+                all_experiments.append((label, ss))
+
+        total_experiments = len(all_experiments)
+        self.logger.info(f"Total experiments to execute: {total_experiments}")
+        self.logger.info(f"Max concurrent tasks: {num_slots}")
         
-            while experiment_queue or active_tasks:
-                # Submit new tasks if we have capacity and experiments waiting
-                while len(active_tasks) < num_slots and experiment_queue:
-                    label, ss = experiment_queue.pop(0)
-                    task_future = self.executor.submit_task(
-                        execute_sampler,
-                        self.circuit_cutting_qiskit_options,
-                        label,
-                        [ss],
-                        resources=resources,
-                        shots=2**12,
+        # STRAGGLER MITIGATION: Sort experiments by complexity (most complex first)
+        # This "Longest Job First" strategy minimizes makespan by scheduling
+        # expensive tasks early, preventing stragglers from accumulating at the end
+        self.logger.info("=" * 80)
+        self.logger.info("STRAGGLER MITIGATION: Sorting experiments by complexity")
+        
+        # Calculate complexity metric for each experiment (depth × gates)
+        experiments_with_complexity = []
+        for label, circuit in all_experiments:
+            complexity = circuit.depth() * circuit.size()  # depth × total gates
+            experiments_with_complexity.append((label, circuit, complexity))
+        
+        # Sort by complexity (highest first)
+        experiments_with_complexity.sort(key=lambda x: x[2], reverse=True)
+        
+        # Log complexity distribution
+        complexities = [x[2] for x in experiments_with_complexity]
+        self.logger.info(f"  Complexity range: {min(complexities):.0f} - {max(complexities):.0f}")
+        self.logger.info(f"  Complexity mean: {np.mean(complexities):.0f}")
+        self.logger.info(f"  Complexity median: {np.median(complexities):.0f}")
+        self.logger.info(f"  Most complex task scheduled first (complexity={complexities[0]:.0f})")
+        self.logger.info(f"  Least complex task scheduled last (complexity={complexities[-1]:.0f})")
+        
+        # Create queue with sorted experiments (remove complexity metric)
+        experiment_queue = [(label, circuit) for label, circuit, _ in experiments_with_complexity]
+        
+        # Log sample of scheduled order for verification
+        self.logger.info(f"  First 5 tasks (most complex):")
+        for i in range(min(5, len(experiments_with_complexity))):
+            label, circuit, complexity = experiments_with_complexity[i]
+            self.logger.info(f"    Task {i}: depth={circuit.depth()}, gates={circuit.size()}, complexity={complexity:.0f}")
+        
+        if len(experiments_with_complexity) > 10:
+            self.logger.info(f"  Last 5 tasks (least complex):")
+            for i in range(max(0, len(experiments_with_complexity)-5), len(experiments_with_complexity)):
+                label, circuit, complexity = experiments_with_complexity[i]
+                self.logger.info(f"    Task {i}: depth={circuit.depth()}, gates={circuit.size()}, complexity={complexity:.0f}")
+        
+        self.logger.info("=" * 80)
+        iteration_count = 0
+        last_log_time = time.time()
+
+        while experiment_queue or active_tasks:
+            iteration_count += 1
+
+            # Submit new tasks if we have capacity and experiments waiting
+            while len(active_tasks) < num_slots and experiment_queue:
+                label, ss = experiment_queue.pop(0)
+
+                # Log circuit characteristics at submission for straggler analysis
+                log_subexperiment_characteristics(
+                    self.logger,
+                    number_of_tasks + 1,  # task_id
+                    label,
+                    ss,  # circuit
+                    stage="SUBMIT"
+                )
+
+                # Log first few task submissions for debugging
+                if number_of_tasks < 3:
+                    self.logger.info(
+                        f"[TASK SUBMIT] Task {number_of_tasks + 1}: "
+                        f"label={label}, resources={resources}, "
+                        f"num_slots={num_slots}, queue_remaining={len(experiment_queue)}"
                     )
-                    active_tasks.append(task_future)
-                    tasks.append(task_future)
-                    number_of_tasks += 1
-                    
-                 # Check for completed tasks using ray.wait()
-                if active_tasks:
-                    ready_refs, remaining_refs = ray.wait(active_tasks, timeout=0.1)  # 100ms timeout
-                
-                # Process completed tasks
-                for task_ref in ready_refs:
-                    result = ray.get(task_ref)  # Get the result
-                    results_tuple.append(result)
-                    active_tasks.remove(task_ref)
 
-            # if use_ray:
-            #     for ss in subsystem_subexpts:
+                # Get number of threads from task resources
+                num_threads = self.sub_circuit_task_resources.get('num_threads', 1)
 
-            #         # if self.sub_circuit_task_resources["num_gpus"] > 0:                      
-            #         #     while not self.check_gpu_availability():
-            #         #         print("No GPU available, retrying...")
-            #         #         time.sleep(1)
-                       
-            #         task_future = self.executor.submit_task(
-            #             execute_sampler,
-            #             self.circuit_cutting_qiskit_options,
-            #             label,
-            #             [ss],
-            #             resources=resources,
-            #             shots=2**12,
-            #         )
-                
-            #         tasks.append(task_future)
-            #         number_of_tasks = number_of_tasks + 1 
-            # else:
-            #     # sequential version
-            #     for ss in subsystem_subexpts:
-            #         result = execute_sampler(self.circuit_cutting_qiskit_options, label, [ss], shots=2**12)
-            #         print(result)
-            #         results_tuple.append(result)
-            #         number_of_tasks = number_of_tasks + 1 
+                task_future = self.executor.submit_task(
+                    execute_sampler,
+                    self.circuit_cutting_qiskit_options,
+                    label,
+                    [ss],
+                    2**12,  # shots
+                    num_threads,  # num_threads
+                    resources=resources,
+                )
+                active_tasks.append(task_future)
+                tasks.append(task_future)
+                number_of_tasks += 1
 
-        # temporary fix for the parallel version
-        # if use_ray:
-        #     results_tuple = self.executor.get_results(tasks)
+            # Log progress periodically (every 2 seconds)
+            current_time = time.time()
+            if current_time - last_log_time >= 2.0:
+                completed = total_experiments - len(experiment_queue) - len(active_tasks)
+                self.logger.info(
+                    f"[PROGRESS] Iter {iteration_count}: "
+                    f"Completed: {completed}/{total_experiments}, "
+                    f"Active: {len(active_tasks)}, "
+                    f"Queued: {len(experiment_queue)}"
+                )
+                last_log_time = current_time
+
+            # Check for completed tasks using ray.wait()
+            ready_refs = []
+            if active_tasks:
+                ready_refs, remaining_refs = ray.wait(active_tasks, timeout=0.1)  # 100ms timeout
+                # Update active_tasks to only include remaining tasks
+                active_tasks = list(remaining_refs)
+
+            # Process completed tasks
+            for task_ref in ready_refs:
+                result = ray.get(task_ref)  # Get the result
+                results_tuple.append(result)
+
+                # Log task completion with timing for straggler analysis
+                if result and len(result) >= 3:
+                    label, primitive_result, task_time = result[:3]
+                    self.logger.info(
+                        f"[SUBEXPT_COMPLETE] label={label}, task_time={task_time:.3f}s"
+                    )
+
+        self.logger.info("=" * 80)
+        self.logger.info(f"All {total_experiments} experiments completed successfully!")
+        self.logger.info("=" * 80)
 
         sub_circuit_execution_end_time = time.time()
         subcircuit_exec_time_secs = (
             sub_circuit_execution_end_time - sub_circuit_execution_time
         )
         self.logger.info(f"Execution time for subcircuits: {subcircuit_exec_time_secs}")
-        
-        # Get all samplePubResults
+
+        # Collect task timing statistics
+        task_times = []
         samplePubResults = collections.defaultdict(list)
+
         for result in results_tuple:
             if result is None:
                 self.logger.warning("Skipping None result from failed task")
                 continue
-            self.logger.info(f"Result: {result[0], result[1]}")
-            samplePubResults[result[0]].extend(result[1]._pub_results)
+
+            # Unpack result tuple: (label, primitive_result, task_time)
+            if len(result) == 3:
+                label, primitive_result, task_time = result
+                task_times.append(task_time)
+            else:
+                # Fallback for old format (label, primitive_result)
+                label, primitive_result = result[0], result[1]
+
+            self.logger.info(f"Result: {label}")
+            samplePubResults[label].extend(primitive_result._pub_results)
+
+        # Log task time statistics
+        if task_times:
+            self.logger.info("=" * 80)
+            self.logger.info("TASK EXECUTION TIME STATISTICS")
+            self.logger.info("=" * 80)
+            self.logger.info(f"  Number of tasks: {len(task_times)}")
+            self.logger.info(f"  Min task time: {min(task_times):.3f}s")
+            self.logger.info(f"  Max task time: {max(task_times):.3f}s")
+            self.logger.info(f"  Mean task time: {np.mean(task_times):.3f}s")
+            self.logger.info(f"  Median task time: {np.median(task_times):.3f}s")
+            self.logger.info(f"  Std dev: {np.std(task_times):.3f}s")
+            self.logger.info(f"  Coefficient of variation: {np.std(task_times)/np.mean(task_times)*100:.1f}%")
+            self.logger.info(f"  Range (max-min): {max(task_times) - min(task_times):.3f}s")
+            self.logger.info("=" * 80)
 
         # Check if we have any valid results
         if not samplePubResults:
@@ -710,17 +1092,26 @@ class CircuitCutting(Motif):
         )
 
         final_expval = np.dot(reconstructed_expvals, observable.coeffs)
+        final_expval = float(np.real(final_expval))  # Convert to float 
         self.logger.info(f"Reconstructed expectation value: {np.real(np.round(final_expval, 8))}")
 
         metrics =  {
             'find_cuts_time': end_find_cuts - start_find_cuts,
             'transpile_time': transpile_time_secs,
             'subcircuit_exec_time': subcircuit_exec_time_secs,
-            'find_cuts_time': end_find_cuts - start_find_cuts,
             'reconstruction_time': reconstruct_subcircuit_expectations_time_secs,
             'total_runtime': total_runtime_secs,
-            'number_of_tasks': number_of_tasks            
+            'number_of_tasks': number_of_tasks,
+            'task_times': task_times
         }
+
+        # Force garbage collection and wait for Ray to clean up resources
+        import gc
+        gc.collect()
+
+        # Give Ray time to release GPU resources from completed tasks
+        self.logger.info("Waiting for GPU resources to be released...")
+        time.sleep(2)
 
         return final_expval, metrics
 
@@ -764,21 +1155,33 @@ class CircuitCutting(Motif):
         estimator_start = time.time()
 
         # num_nodes attribute in task resource description in Ray
-        ray_task_resources = {k: v for k, v in self.full_circuit_task_resources.items() if k != "num_nodes"}
-        
+        # For MPI tasks, remove memory constraint since srun manages resources
+        # Also remove mpi_ranks and num_threads as they are custom fields not recognized by Ray
+        ray_task_resources = {k: v for k, v in self.full_circuit_task_resources.items()
+                             if k not in ["num_nodes", "memory", "mpi_ranks", "num_threads"]}
+
+        # Get number of threads from task resources
+        num_threads = self.full_circuit_task_resources.get('num_threads', 1)
+
         if "mpi" not in full_circuit_qiskit_options or full_circuit_qiskit_options["mpi"] == False:
             # Execute the circuit without
             # exact_expval = run_full_circuit(observable, full_circuit_qiskit_options, full_circuit_transpilation)
-            
+
             # Submit task for non-MPI execution directly as a Ray / Dask task
             full_circuit_task = self.executor.submit_task(
                 run_full_circuit,
                 observable,
                 full_circuit_qiskit_options,
                 full_circuit_transpilation,
+                num_threads,  # num_threads
                 resources=ray_task_resources
             )
-            exact_expval = self.executor.get_results([full_circuit_task])
+            result = self.executor.get_results([full_circuit_task])
+            exact_expval = result[0] if isinstance(result, list) else result
+
+            # Check if the result is an error string
+            if isinstance(exact_expval, str):
+                raise RuntimeError(f"Full circuit simulation failed: {exact_expval}")
         else:
             
             # Serialize the circuit and observable to files
@@ -804,9 +1207,17 @@ class CircuitCutting(Motif):
           
             # Submit task for MPI parallel execution via command line
 
-            cmd = ["srun", "-N", str(num_nodes), 
-                   f"--ntasks-per-node={self.full_circuit_task_resources['num_gpus']}", "--gpus-per-task=1" , "python", "-m", 
-                   "mini_apps.quantum_simulation.motifs.circuit_cutting_motif",
+            # Get number of MPI ranks per node
+            # Prefer mpi_ranks field if available, otherwise fall back to num_gpus
+            ntasks_per_node = self.full_circuit_task_resources.get('mpi_ranks')
+            if ntasks_per_node is None or ntasks_per_node == 0:
+                ntasks_per_node = self.full_circuit_task_resources.get('num_gpus', 1)
+                if ntasks_per_node == 0:
+                    ntasks_per_node = 1  # Final fallback if num_gpus was 0
+
+            cmd = ["srun", "-N", str(num_nodes),
+                   f"--ntasks-per-node={ntasks_per_node}", "--gpus-per-task=1", "python", "-m",
+                   "mini_apps.quantum_simulation.circuit_cutting.motif",
                    observable_file, backend_file, circuit_file]
             
             self.logger.info(f"Running command: {' '.join(cmd)}")
@@ -880,6 +1291,7 @@ class CircuitCutting(Motif):
             circuit_cutting_reconstruct_subcircuit_expectations_time_secs = metrics['reconstruction_time']
             circuit_cutting_total_runtime_secs = metrics['total_runtime']
             number_of_tasks = metrics['number_of_tasks']
+            task_times = metrics['task_times']
 
         if self.circuit_cutting_only == False: # Run full circuit simulation
             exact_expval, full_metrics = self.run_full_circuit_simulation(circuit, observable, full_circuit_qiskit_options)
@@ -897,13 +1309,33 @@ class CircuitCutting(Motif):
             self.logger.info(
                 f"Relative error in estimation: {np.real(np.round((final_expval-exact_expval) / exact_expval, 8))}"
             )
-        
+
+        # Calculate QDreamer prediction metrics (if QDreamer was used)
+        actual_speedup = None
+        speedup_error = None
+        prediction_accuracy = None
+
+        if self.qdreamer_allocation and self.full_circuit_only == False and self.circuit_cutting_only == False:
+            # Calculate actual speedup from execution times
+            if 'circuit_cutting_total_runtime_secs' in locals() and 'full_circuit_total_runtime_secs' in locals():
+                if circuit_cutting_total_runtime_secs > 0:
+                    actual_speedup = full_circuit_total_runtime_secs / circuit_cutting_total_runtime_secs
+                    predicted_speedup = self.qdreamer_allocation.speedup_factor
+                    speedup_error = abs(actual_speedup - predicted_speedup)
+                    if max(predicted_speedup, actual_speedup) > 0:
+                        prediction_accuracy = (min(predicted_speedup, actual_speedup) / max(predicted_speedup, actual_speedup) * 100)
+
+        # Compute qdreamer_num_cuts for metrics (None if QDreamer not used)
+        qdreamer_num_cuts = self.qdreamer_allocation.num_cuts if self.qdreamer_allocation else None
+
         # Write metrics to file
         self.metrics_file_writer.write(
             [
                 getattr(self, "experiment_start_time", None),
                 getattr(self, "subcircuit_size", None),
                 getattr(self, "base_qubits", None),
+                getattr(self, "circuit_type", None),
+                getattr(self, "circuit_depth", None),
                 getattr(self, "observables", None),
                 getattr(self, "scale_factor", None),
                 getattr(self, "num_samples", None),
@@ -917,8 +1349,8 @@ class CircuitCutting(Motif):
                 circuit_cutting_find_cuts_time_secs if 'circuit_cutting_find_cuts_time_secs' in locals() else None,
                 circuit_cutting_transpile_time_secs if 'circuit_cutting_transpile_time_secs' in locals() else None,
                 circuit_cutting_exec_time_secs if 'circuit_cutting_exec_time_secs' in locals() else None,
-                circuit_cutting_reconstruct_subcircuit_expectations_time_secs if 'circuit_cutting_reconstruct_subcircuit_expectations_time_secs' in 
-                locals() else None,                
+                circuit_cutting_reconstruct_subcircuit_expectations_time_secs if 'circuit_cutting_reconstruct_subcircuit_expectations_time_secs' in
+                locals() else None,
                 circuit_cutting_total_runtime_secs if 'circuit_cutting_total_runtime_secs' in locals() else None,
                 full_circuit_transpile_time_secs if 'full_circuit_transpile_time_secs' in locals() else None,
                 full_circuit_exec_time_sec if 'full_circuit_exec_time_sec' in locals() else None,
@@ -926,7 +1358,28 @@ class CircuitCutting(Motif):
                 final_expval if 'final_expval' in locals() else None,
                 exact_expval if 'exact_expval' in locals() else None,
                 float(error_in_estimation) if 'error_in_estimation' in locals() else None,
-                self.scenario_label
+                self.scenario_label,
+                # QDreamer prediction columns (None if QDreamer not used)
+                qdreamer_num_cuts,
+                self.qdreamer_allocation.sampling_overhead if self.qdreamer_allocation else None,
+                self.qdreamer_allocation.speedup_factor if self.qdreamer_allocation else None,
+                actual_speedup,
+                speedup_error,
+                prediction_accuracy,
+                # GPU configuration
+                self.gpu_mode if hasattr(self, 'gpu_mode') else None,
+                self.gpu_fraction if hasattr(self, 'gpu_fraction') else None,
+                self.gpu_type if hasattr(self, 'gpu_type') else None,
+                self.num_slots if hasattr(self, 'num_slots') else None,
+                # Cut type counts
+                self.num_gate_cuts if hasattr(self, 'num_gate_cuts') else None,
+                self.num_wire_cuts if hasattr(self, 'num_wire_cuts') else None,
+                # Parallelization configuration
+                self.num_nodes if hasattr(self, 'num_nodes') else None,
+                self.cores_per_node if hasattr(self, 'cores_per_node') else None,
+                self.gpus_per_node if hasattr(self, 'gpus_per_node') else None,
+                # Task runtimes as JSON array
+                json.dumps(task_times) if 'task_times' in locals() else None
             ]
         )
 
@@ -940,13 +1393,36 @@ class CircuitCutting(Motif):
         This method creates a random quantum circuit using the EfficientSU2 ansatz with a specified
         number of qubits and entanglement pattern. The circuit parameters are assigned a fixed value.
         It also constructs an observable by scaling the provided observables.
+        
+        If a custom circuit was set via set_circuit(), it uses that instead of generating a new one.
 
         Returns:
             Tuple[QuantumCircuit, SparsePauliOp]: A tuple containing the generated quantum circuit and the observable.
         """
-        # Generate standard circuit comprising of 1 single qubit rotation and 1 entangling  gates between all qubits for each layer
-        circuit = EfficientSU2(self.base_qubits * self.scale_factor, entanglement="linear", reps=2).decompose()
-        circuit.assign_parameters([0.4] * len(circuit.parameters), inplace=True)
+        # Use custom circuit if provided (ensures same circuit as QDreamer optimization)
+        if hasattr(self, 'custom_circuit') and self.custom_circuit is not None:
+            circuit = self.custom_circuit
+            # Check if the custom circuit is an EfficientSU2 circuit (or derived from one)
+            if isinstance(circuit, EfficientSU2):
+                self.circuit_type = "EfficientSU2"
+                self.circuit_depth = circuit.reps
+                self.logger.info(f"Using pre-generated EfficientSU2 circuit ({circuit.num_qubits}q, reps={circuit.reps}, id={id(circuit)}) - matches QDreamer optimization")
+            elif hasattr(circuit, '_efficientsu2_reps'):
+                # Support for decomposed EfficientSU2 circuits that store reps as metadata
+                self.circuit_type = "EfficientSU2"
+                self.circuit_depth = circuit._efficientsu2_reps
+                self.logger.info(f"Using pre-generated decomposed EfficientSU2 circuit ({circuit.num_qubits}q, reps={circuit._efficientsu2_reps}, id={id(circuit)}) - matches QDreamer optimization")
+            else:
+                self.circuit_type = "Custom"
+                self.circuit_depth = circuit.depth()
+                self.logger.info(f"Using pre-generated custom circuit ({circuit.num_qubits}q, {len(circuit)} gates, id={id(circuit)}) - matches QDreamer optimization")
+        else:
+            # Generate standard circuit comprising of 1 single qubit rotation and 1 entangling  gates between all qubits for each layer
+            reps = self.default_circuit_depth
+            circuit = EfficientSU2(self.base_qubits * self.scale_factor, entanglement="linear", reps=reps).decompose()
+            circuit.assign_parameters([0.4] * len(circuit.parameters), inplace=True)
+            self.circuit_type = "EfficientSU2"
+            self.circuit_depth = reps
 
         observable = SparsePauliOp([o * self.scale_factor for o in self.observables])
 
