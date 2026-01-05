@@ -58,9 +58,7 @@ class PilotQuantumExecutor(Executor):
             excludes = self.cluster_config.get("config", {}).get("runtime_env", {}).get("excludes", self._default_ray_excludes)
             
             # Merge excludes into runtime_env
-            if "runtime_env" not in kwargs:
-                kwargs["runtime_env"] = {}
-            elif kwargs["runtime_env"] is None:
+            if kwargs.get("runtime_env") is None:
                 kwargs["runtime_env"] = {}
             
             # Merge excludes, avoiding duplicates
