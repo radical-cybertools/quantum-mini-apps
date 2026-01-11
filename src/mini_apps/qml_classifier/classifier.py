@@ -50,7 +50,7 @@ if __name__ == "__main__":
             "walltime": 30,
             "type": "ray",
             "project": "m4408",
-            "conda_environment": "/pscratch/sd/f/fkiwit/conda/qma/",
+            "conda_environment": "<PATH>",
             "scheduler_script_commands": ["#SBATCH --constraint=gpu", 
                                           "#SBATCH --gpus-per-task=1",
                                           "#SBATCH --ntasks-per-node=4",

@@ -171,7 +171,8 @@ export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
 
 <!-- * Compiler Commands:
 
-
+    * use miniforge and conda-forge: <https://github.com/conda-forge/miniforge>
+    
     * create conda env
 
     ```

@@ -78,13 +78,6 @@ qs.run()
 qs.close()
 ```
 
-### Running Benchmarks
-```python
-from mini_apps.quantum_simulation.circuit_cutting.mini_app import run_mini_app_benchmark
-
-# Execute benchmark suite
-run_mini_app_benchmark()
-```
 
 ## Key Components
 

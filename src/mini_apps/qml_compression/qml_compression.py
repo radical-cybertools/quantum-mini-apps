@@ -120,7 +120,7 @@ if __name__ == "__main__":
             "walltime": int(1920 / num_nodes),
             "type": "ray",
             "project": "m4408",
-            "conda_environment": "/pscratch/sd/f/fkiwit/conda/qma/",
+            "conda_environment": "<PATH>",
             "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
         }
     }
