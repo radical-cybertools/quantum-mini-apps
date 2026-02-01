@@ -130,6 +130,11 @@ Each Mini-App provides in-depth documentation. The following Mini-Apps are curre
 - Analyzes quantum circuit characteristics (number of qubits, gates)
 - Optimizes circuit partitioning to maximize parallel execution speedup
 
+**Examples:**
+- [Basic Analysis](src/mini_apps/quantum_simulation/circuit_cutting/qdreamer/examples/basic.py) - Standalone optimization without executor
+- [Executor Integration](src/mini_apps/quantum_simulation/circuit_cutting/qdreamer/examples/executor.py) - Complete pipeline with Pilot-Quantum
+- [Model Calibration](src/mini_apps/quantum_simulation/circuit_cutting/qdreamer/examples/calibration.py) - Full calibration with measurements
+
 [**State Vector Mini-Apps**](src/mini_apps/quantum_simulation/distributed_state_vector/README.md) - Distributed state vector simulation using MPI.
 
 
