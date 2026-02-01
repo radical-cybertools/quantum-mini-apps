@@ -3,7 +3,7 @@
 #SBATCH --output=slurm_output/run_%A/output_%A_%a.out
 #SBATCH --error=slurm_output/run_%A/error_%A_%a.err
 #SBATCH --nodes=1
-#SBATCH --account=m4408
+#SBATCH --account=<YOUR_PROJECT_ID>  # Set to your NERSC/HPC project allocation
 #SBATCH --qos=premium
 #SBATCH --constraint=cpu
 #SBATCH --time=12:00:00

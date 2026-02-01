@@ -1,4 +1,5 @@
 import glob
+import os
 import numpy as np
 import pandas as pd
 import ast
@@ -16,7 +17,9 @@ benchmark_runs = [
 # times_data = [np.load(file, allow_pickle=True) for file in times_files]
 
 def get_times_data(dir):
-    dir = f"/pscratch/sd/f/fkiwit/work_2/{dir}"
+    # Set WORK_DIR environment variable to your working directory
+    work_base = os.environ.get("WORK_DIR", "./work")
+    dir = f"{work_base}/{dir}"
     print(dir)
     times = []
     times_files = glob.glob(f"{dir}/*times.npy")

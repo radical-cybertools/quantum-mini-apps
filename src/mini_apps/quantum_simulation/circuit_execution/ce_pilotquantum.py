@@ -56,8 +56,8 @@ if __name__ == "__main__":
                         "gpus_per_node": 0,
                         "queue": "debug",
                         "walltime": 30,            
-                        "project": "m4408",
-                        "conda_environment": "/pscratch/sd/l/luckow/conda/quantum-mini-apps2",
+                        "project": "<YOUR_PROJECT_ID>",  # Set to your NERSC/HPC project allocation
+                        "conda_environment": "<CONDA_ENV_PATH>",  # Set to your conda environment path
                         "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
                     }
                 }

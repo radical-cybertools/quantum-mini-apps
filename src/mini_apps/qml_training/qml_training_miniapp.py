@@ -134,7 +134,7 @@ if __name__ == "__main__":
                         "gpus_per_node": 0,
                         "queue": "debug",
                         "walltime": 30,            
-                        "project": "m4408",
+                        "project": "<YOUR_PROJECT_ID>",  # Set to your NERSC/HPC project allocation
                         "conda_environment": "",
                         "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
                     }

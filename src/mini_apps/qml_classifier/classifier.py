@@ -49,7 +49,7 @@ if __name__ == "__main__":
             "queue": "premium",
             "walltime": 30,
             "type": "ray",
-            "project": "m4408",
+            "project": "<YOUR_PROJECT_ID>",  # Set to your NERSC/HPC project allocation
             "conda_environment": "<PATH>",
             "scheduler_script_commands": ["#SBATCH --constraint=gpu", 
                                           "#SBATCH --gpus-per-task=1",

@@ -2,7 +2,8 @@ import numpy as np
 import os
 
 # Load the numpy array from the file
-file_path = '/global/homes/f/fkiwit/dev/quantum-mini-apps/src/mini_apps/qml_data_compression/utils/cifar10.npy'
+# Set this to your local path containing cifar10.npy
+file_path = os.environ.get("CIFAR10_PATH", "./cifar10.npy")
 data = np.load(file_path)
 
 print("Shape of the data:", data.shape)

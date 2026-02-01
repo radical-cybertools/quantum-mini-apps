@@ -122,8 +122,8 @@ def training(config):
         grad_fn = partial(map_over_inputs, grad_fn)
 
 
-    # Load data
-    basepath = "/global/homes/f/fkiwit/dev/data_compression/results/cifar_new"
+    # Load data - set DATA_DIR environment variable to your data directory
+    basepath = os.environ.get("DATA_DIR", "./data")
     states_train = np.load(f"{basepath}/train_data.npy")
     states_val = np.load(f"{basepath}/test_data.npy")
     targets_train = np.load(f"{basepath}/train_labels.npy")
@@ -232,7 +232,9 @@ def training(config):
     }
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    basepath_results = f"/pscratch/sd/f/fkiwit/work_classifier/j{config['jit']}_v{config['vmap']}_b{config['batch_size']}_{timestamp}"
+    # Set RESULTS_DIR environment variable to your results directory
+    results_base = os.environ.get("RESULTS_DIR", "./results")
+    basepath_results = f"{results_base}/j{config['jit']}_v{config['vmap']}_b{config['batch_size']}_{timestamp}"
     os.makedirs(basepath_results, exist_ok=True)
 
     for key, value in results_np.items():

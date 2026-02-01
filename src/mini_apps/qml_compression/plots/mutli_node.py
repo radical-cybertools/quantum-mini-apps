@@ -1,16 +1,20 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 # Define the paths and corresponding values
+# Set RESULTS_DIR environment variable to your results directory
+results_dir = os.environ.get("RESULTS_DIR", "./results")
+
+# Example data_info structure - update paths to your result files
 data_info = {
-    1: '/pscratch/sd/f/fkiwit/work_nodes1_2/20241006_024740/result_compression_20241006_024740.csv',
-    2: '/pscratch/sd/f/fkiwit/work_okt01/20241002_081925/result_compression_20241002_081925.csv',
-    4: '/pscratch/sd/f/fkiwit/work_okt01/20241002_122210/result_compression_20241002_122210.csv',
-    8: '/pscratch/sd/f/fkiwit/work_okt01/20241002_053626/result_compression_20241002_053626.csv',
-    16: '/pscratch/sd/f/fkiwit/work_okt01/20241002_044235/result_compression_20241002_044235.csv',
-    32: '/pscratch/sd/f/fkiwit/work_okt01/20241002_141814/result_compression_20241002_141814.csv'
-    # 32: '/pscratch/sd/f/fkiwit/work_okt01/20241002_044235/result_compression_20241002_044235.csv'
+    1: f'{results_dir}/nodes1/result_compression.csv',
+    2: f'{results_dir}/nodes2/result_compression.csv',
+    4: f'{results_dir}/nodes4/result_compression.csv',
+    8: f'{results_dir}/nodes8/result_compression.csv',
+    16: f'{results_dir}/nodes16/result_compression.csv',
+    32: f'{results_dir}/nodes32/result_compression.csv',
 }
 
 nodes = list(data_info.keys())

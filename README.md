@@ -4,13 +4,15 @@ This repository contains a framework for developing and benchmarking Quantum Min
 
 ## Overview
 
-The Quantum Mini-Apps framework provides a modular and extensible architecture for defining and executing quantum computing motifs, which are fundamental building blocks or patterns of quantum algorithms. The framework leverages the power of Qiskit for quantum circuit simulation and Dask for parallel and distributed execution.
+The Quantum Mini-Apps framework provides a modular and extensible architecture for defining and executing quantum computing motifs, which are fundamental building blocks or patterns of quantum algorithms. The framework leverages Qiskit and Pennylane for quantum circuit simulation and Dask/Ray for parallel and distributed execution.
 
 The main components of the framework are:
 
-1. **Mini-Apps**: Mini-Apps are high-level applications that combine one or more motifs to perform a specific quantum computing task or benchmark. A motif captures reoccuring executing patterns. For example, the Circuit Execution mini-app executes a quantum circuit on a quantum simulator or hardware backend.
+1. **Mini-Apps**: Mini-Apps are high-level applications that combine one or more motifs to perform a specific quantum computing task or benchmark. A motif captures recurring execution patterns. For example, the Circuit Execution mini-app executes a quantum circuit on a quantum simulator or hardware backend.
 
 2. **Executor**: The executor component manages the execution of motifs on different computing environments, such as local machines, clusters, or cloud resources. It supports different execution backends, including Dask and Ray.
+
+3. **QDreamer**: An intelligent optimization framework for quantum circuit cutting that automatically detects hardware resources and optimizes circuit partitioning for maximum parallel execution speedup.
 
 
 
@@ -73,19 +75,62 @@ python src/mini_apps/quantum_simulation/circuit_execution/ce_local.py
 
 This will execute the `QuantumSimulation` Mini-App with the default configuration, which runs a circuit execution motif on a local Dask cluster.
 
+## Configuration
+
+Before running mini-apps on HPC systems (e.g., NERSC Perlmutter), you need to configure the following settings in the example scripts:
+
+### Required Settings
+
+| Setting | Description | Where to Set |
+|---------|-------------|--------------|
+| `project` | Your HPC project allocation ID (e.g., `m1234`) | Python scripts: replace `<YOUR_PROJECT_ID>` |
+| `conda_environment` | Path to your conda environment | Python scripts: replace `<CONDA_ENV_PATH>` |
+
+### Optional Environment Variables
+
+The following environment variables can be set to customize data and output paths:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATA_DIR` | Directory containing training/test data | `./data` |
+| `RESULTS_DIR` | Directory for storing results | `./results` |
+| `WORK_DIR` | Working directory for intermediate files | `./work` |
+| `QML_DATA_DIR` | Directory for QML compression data | `./data` |
+| `CIFAR10_PATH` | Path to CIFAR-10 dataset file | `./cifar10.npy` |
+| `SCHEDULER_FILE` | Path to Dask scheduler file | `./scheduler_file.json` |
+
+**Example:**
+```bash
+export DATA_DIR=/path/to/your/data
+export RESULTS_DIR=/path/to/your/results
+export WORK_DIR=/scratch/your_username/work
+```
+
+### SLURM Batch Scripts
+
+For batch submission scripts in `src/mini_apps/qml_compression/`, update the `--account` directive:
+```bash
+#SBATCH --account=<YOUR_PROJECT_ID>  # Replace with your allocation
+```
+
 ## Extending the Mini-App framework
 Contributions to the Quantum Mini-Apps framework are welcome! If you encounter any issues or have suggestions for improvements, please open an issue or submit a pull request. 
 
 ## Mini Apps
-Each Mini-App provides an in-depth documentation. The following Mini-Apps are currently implemented:
+Each Mini-App provides in-depth documentation. The following Mini-Apps are currently implemented:
 
 ### Quantum Simulation
 
-[**Circuit Execution**](src/mini_apps/quantum_simulation/circuit_execution/README.md)
+[**Circuit Execution**](src/mini_apps/quantum_simulation/circuit_execution/README.md) - Execute quantum circuits on simulators or hardware backends.
 
-[**Circuit Cutting**](src/mini_apps/quantum_simulation/circuit_cutting/README.md)
+[**Circuit Cutting**](src/mini_apps/quantum_simulation/circuit_cutting/README.md) - Decompose large quantum circuits into smaller subcircuits for parallel execution with configurable backends and GPU acceleration.
 
-[**State Vector Mini-Apps**](src/mini_apps/quantum_simulation/distributed_state_vector/README.md)
+[**QDreamer**](src/mini_apps/quantum_simulation/circuit_cutting/qdreamer/README.md) - Resource-aware quantum circuit cutting optimization framework that:
+- Automatically detects available hardware resources (GPUs, CPUs, memory)
+- Analyzes quantum circuit characteristics (number of qubits, gates)
+- Optimizes circuit partitioning to maximize parallel execution speedup
+
+[**State Vector Mini-Apps**](src/mini_apps/quantum_simulation/distributed_state_vector/README.md) - Distributed state vector simulation using MPI.
 
 
 ### Quantum Machine Learning 

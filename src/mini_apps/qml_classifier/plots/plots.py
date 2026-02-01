@@ -22,8 +22,10 @@ if os.path.exists(mean_std_file):
 else:
     print(f"Creating {mean_std_file}")
     data_list = []
+    # Set WORK_DIR environment variable to your results directory
+    work_dir = os.environ.get("WORK_DIR", "./work_classifier")
     for d in data:
-        path = f"/pscratch/sd/f/fkiwit/work_classifier/{d}"
+        path = f"{work_dir}/{d}"
         with open(f"{path}/times.yml", 'r') as file:
             times_data = yaml.safe_load(file)
         with open(f"{path}/config.yml", 'r') as file:

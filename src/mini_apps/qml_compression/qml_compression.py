@@ -56,7 +56,9 @@ def workflow(index: int):
     # Step 0: Encode the image the image as quantum state and transform it to target MPS
     times = {}
     times["time_start_loading"] = perf_counter()
-    image = np.load(f"/pscratch/sd/f/fkiwit/data/{index}.npy", allow_pickle=True)
+    # Data path - set via environment variable or use default
+    data_dir = os.environ.get("QML_DATA_DIR", "./data")
+    image = np.load(f"{data_dir}/{index}.npy", allow_pickle=True)
     states = FRQI_RGBa_encoding(image[None])
     target_tensor, Lambdtarget_tensor = calc_MPS(np.asarray(states))
     target_tensor = right_canonical(target_tensor)
@@ -119,7 +121,7 @@ if __name__ == "__main__":
             # "walltime": 30,
             "walltime": int(1920 / num_nodes),
             "type": "ray",
-            "project": "m4408",
+            "project": "<YOUR_PROJECT_ID>",  # Set to your NERSC/HPC project allocation
             "conda_environment": "<PATH>",
             "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
         }
