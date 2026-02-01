@@ -160,7 +160,7 @@ cluster_config = {
         "gpus_per_node": 4,
         "queue": "premium",
         "walltime": 30,
-        "project": "m4408",
+        "project": "<YOUR_PROJECT_ID>",  # Set to your NERSC/HPC project allocation
         "scheduler_script_commands": [
             "#SBATCH --constraint=gpu&hbm80g",
             "#SBATCH --gpus-per-task=1",

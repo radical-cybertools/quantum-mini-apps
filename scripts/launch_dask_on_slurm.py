@@ -21,7 +21,7 @@ def launch_dask_on_slurm(num_workers, cores_per_worker, memory_per_worker, sched
 #SBATCH --ntasks-per-node={num_workers}
 #SBATCH --job-name=dask-cluster
 #SBATCH -t 0:30:00
-#SBATCH -A m4408
+#SBATCH -A <YOUR_PROJECT_ID>  # Set to your NERSC/HPC project allocation
 #SBATCH --constraint=cpu
 #SBATCH -q premium
 
@@ -86,7 +86,8 @@ def launch_dask_on_slurm(num_workers, cores_per_worker, memory_per_worker, sched
 num_workers = 4
 cores_per_worker = 2
 memory_per_worker = 4
-scheduler_file = '/global/homes/p/prmantha/scheduler_file.json'
+# Set scheduler file path in your working directory
+scheduler_file = os.environ.get("SCHEDULER_FILE", "./scheduler_file.json")
 
 num_nodes = 2  # Update with the desired number of nodes
 scheduler_info = launch_dask_on_slurm(num_workers, cores_per_worker, memory_per_worker, scheduler_file, num_nodes)

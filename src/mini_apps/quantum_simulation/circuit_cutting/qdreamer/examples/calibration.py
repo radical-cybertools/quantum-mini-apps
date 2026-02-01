@@ -1,16 +1,19 @@
 """
-QDreamer Circuit Cutting Example
+QDreamer Model Calibration Example
 
 This example demonstrates how to use QDreamer to optimize and execute circuit cutting
 with automatically optimized parameters based on your available hardware resources.
 
+Full-scale calibration experiments for fitting the power-law speedup model to your hardware.
+
 Usage:
-    python -m mini_apps.quantum_simulation.circuit_cutting.qdreamer.example
+    python -m mini_apps.quantum_simulation.circuit_cutting.qdreamer.examples.calibration
 """
 
 import os
 import datetime
 import logging
+import json
 import csv
 import subprocess
 import re
@@ -88,6 +91,19 @@ def create_executor(num_nodes, cores_per_node, gpus_per_node):
         Executor instance configured with the specified resources
     """
     
+    # Get CUDA_VISIBLE_DEVICES and calculate actual visible GPU count
+    cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if cuda_visible_devices and gpus_per_node > 0:
+        # Count actual GPUs in CUDA_VISIBLE_DEVICES
+        visible_gpu_count = len([x.strip() for x in cuda_visible_devices.split(',') if x.strip()])
+        # Use the minimum of requested and visible
+        actual_gpus = min(gpus_per_node, visible_gpu_count)
+        if actual_gpus < gpus_per_node:
+            print(f"Warning: Requested {gpus_per_node} GPUs but only {visible_gpu_count} visible in CUDA_VISIBLE_DEVICES={cuda_visible_devices}")
+            print(f"Using {actual_gpus} GPUs")
+    else:
+        actual_gpus = gpus_per_node
+    
     cluster_config = {
         "executor": "pilot",
         "config": {
@@ -96,9 +112,14 @@ def create_executor(num_nodes, cores_per_node, gpus_per_node):
             "type": "ray",
             "number_of_nodes": num_nodes,
             "cores_per_node": cores_per_node,
-            "gpus_per_node": gpus_per_node,
+            "gpus_per_node": actual_gpus,
+            "cuda_visible_devices": cuda_visible_devices,
+            #"ray_override_resources": None # json.dumps({"GPU": actual_gpus}) if actual_gpus > 0 else None,
             # Exclude large files from Ray runtime environment
             "runtime_env": {
+                "env_vars": {
+                    "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES", ""),
+                },
                 "excludes": [
                     ".git/**",
                     ".git/lfs/**",
@@ -321,7 +342,7 @@ def run_experiment(num_qubits, executor, result_file,
             "mpi": False
         })
         .set_full_circuit_only(False)
-        .set_circuit_cutting_only(False)
+        .set_circuit_cutting_only(True)
         .set_scenario_label(f"qdreamer_optimized_{num_qubits}q_repeat{repeat}" if repeat is not None else f"qdreamer_optimized_{num_qubits}q")
         .set_qdreamer_allocation(alloc)  # Pass QDreamer allocation for unified CSV
         .set_gpu_mode(use_gpu)  # Track GPU mode in CSV
@@ -563,7 +584,7 @@ def run_callibration(
                         "mpi": False
                     })
                     .set_full_circuit_only(False)  
-                    .set_circuit_cutting_only(False)
+                    .set_circuit_cutting_only(True)
                     .set_scenario_label(f"calibration_{num_qubits}q_{subcircuit_size}q_{allocation.num_cuts}cuts_repeat{repeat}")
                     .set_qdreamer_allocation(allocation)  # Pass predictions for comparison
                     .set_gpu_mode(use_gpu)
@@ -898,9 +919,10 @@ def main():
     # Configuration
     # ============================================================================
     
-    QUBIT_RANGE = [36]  # Range of qubit sizes to test
+    QUBIT_RANGE = [30]  # Range of qubit sizes to test
     NUM_REPEATS = 1
     GPU_FRACTION = 1
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3,4,5,6,7"
     NUM_SAMPLES_LIST = [1_000_000_000]  # List of sample counts to test
     
     # Circuit configuration
@@ -918,9 +940,9 @@ def main():
     #   5 cuts => minimal subcircuit size 6
     #   7 cuts => minimal subcircuit size 5
     #   8 cuts => minimal subcircuit size 4
-    # CALIBRATION_SUBCIRCUIT_SIZES = [18, 12, 9, 7, 6, 5, 4]   # None = auto-generate
-    # CALIBRATION_SUBCIRCUIT_SIZES = [18, 12, 9, 7, 6]   # None = 
-
+    # CALIBRATION_SUBCIRCUIT_SIZES = [18, 12, 9, 8, 6, 5, 4]   # None = auto-generate
+    #CALIBRATION_SUBCIRCUIT_SIZES = [18, 12, 9, 8, 6]   # None = 
+    CALIBRATION_SUBCIRCUIT_SIZES = [8] 
 
     # 34 qubit Scenario
     #   1 cuts => minimal subcircuit size 17
@@ -931,13 +953,13 @@ def main():
     #   6 cuts => minimal subcircuit size 5
     #   7 cuts => minimal subcircuit size 4
     # CALIBRATION_SUBCIRCUIT_SIZES = [17, 12, 9, 7, 6, 5, 4]   
-    CALIBRATION_SUBCIRCUIT_SIZES = [17, 12, 9, 7, 6]   
+    # CALIBRATION_SUBCIRCUIT_SIZES = [17, 12, 9, 7, 6]   
     
     #Parallelization configurations: (nodes, cores_per_node, gpus_per_node)
     # NOTE: Using Qiskit 1.x with qiskit-aer-gpu 0.15.1 for GPU support (not supported in Qiskit 2.x)
     PARALLELIZATION_CONFIGS = [
         # CPU configurations
-        # (1, 1, 0),   # CPU mode: 1 core
+        (1, 1, 0),   # CPU mode: 1 core
         # (1, 2, 0),   # CPU mode: 2 cores
         # (1, 4, 0),   # CPU mode: 4 cores
         # (1, 8, 0),   # CPU mode: 8 cores
@@ -948,10 +970,10 @@ def main():
         # (1, 224, 0),   # CPU mode: 256 cores
         # (1, 128, 0),   # CPU mode: 128 cores
         # GPU configurations (requires CUDA/GPU hardware)
+        # (1, 4, 4),   # GPU mode: 4 GPUs
         (1, 1, 1),   # GPU mode: 1 GPU
-        (1, 2, 2),   # GPU mode: 2 GPUs
-        (1, 4, 4),   # GPU mode: 4 GPUs
-        (1, 8, 8),   # GPU mode: 8 GPUs
+        # (1, 2, 2),   # GPU mode: 2 GPUs
+        # (1, 8, 8),   # GPU mode: 8 GPUs
     ]
 
 
@@ -963,7 +985,8 @@ def main():
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     results_dir = os.path.join(script_dir, "results")
     os.makedirs(results_dir, exist_ok=True)
-    result_file = os.path.join(results_dir, f"qdreamer_multi_qubit_{timestamp}.csv")
+    gpu_type = detect_gpu_type()
+    result_file = os.path.join(results_dir, f"qdreamer_multi_qubit_{gpu_type}_{timestamp}.csv")
     
     # Calculate totals (USE_GPU will be set per config)
     num_subcircuits = len(CALIBRATION_SUBCIRCUIT_SIZES) if CALIBRATION_SUBCIRCUIT_SIZES else 2

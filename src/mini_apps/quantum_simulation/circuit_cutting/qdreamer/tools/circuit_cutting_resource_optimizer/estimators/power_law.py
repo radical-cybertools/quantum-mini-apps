@@ -1,69 +1,23 @@
 """
-Speedup Estimator Plugin API for QDreamer
+Power-Law Speedup Estimator
 
-This module provides a plugin-based architecture for speedup estimation in circuit cutting.
-It includes:
-- SpeedupEstimator: Abstract base class defining the estimator interface
-- PowerLawEstimator: Default estimator using power-law efficiency decay model
-- EstimatorRegistry: Global registry for plugin discovery and selection
-
-The power-law model is based on the equation: η(R) = η_max / R^p
-where R is the number of execution rounds and p is the decay exponent.
+Default estimator using power-law efficiency decay model.
+The model is based on the equation: η(R) = η_max / R^p
 
 Author: QDreamer Team
 """
 
-from __future__ import annotations
-
 import logging
 import math
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Sequence
 
 import numpy as np
 
-from .data_models import EstimatorInput, SpeedupResult
+from ....core.data_models import EstimatorInput, SpeedupResult
+from .base import SpeedupEstimator
 
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# Abstract Base Class
-# =============================================================================
-
-
-class SpeedupEstimator(ABC):
-    """
-    Abstract base class for speedup estimators.
-    
-    All speedup estimation plugins must inherit from this class and implement
-    the estimate_speedup() method and name property.
-    """
-    
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Unique name identifier for this estimator."""
-        pass
-    
-    @abstractmethod
-    def estimate_speedup(self, config: EstimatorInput) -> SpeedupResult:
-        """
-        Estimate speedup for the given configuration.
-        
-        Args:
-            config: EstimatorInput with circuit and resource parameters
-            
-        Returns:
-            SpeedupResult with estimated speedup metrics
-        """
-        pass
-
-
-# =============================================================================
-# Power-Law Efficiency Model
-# =============================================================================
 
 
 class PowerLawEstimator(SpeedupEstimator):
@@ -76,11 +30,11 @@ class PowerLawEstimator(SpeedupEstimator):
     - Efficiency decay: η(R) = η_max / R^p
     - Speedup: S = C_full / C_cut = 2^(n - n_sub) × η(R) / R
     
-    Default parameters (eta_max=0.0008, decay_exponent=0.3233) are fitted from
+    Default parameters (eta_max=0.0002, decay_exponent=0.7630) are fitted from
     experimental measurements on GPU clusters.
     
     Example:
-        >>> estimator = PowerLawEstimator(eta_max=0.0008, decay_exponent=0.3233)
+        >>> estimator = PowerLawEstimator(eta_max=0.0002, decay_exponent=0.7630)
         >>> config = EstimatorInput(
         ...     total_qubits=36,
         ...     subcircuit_qubits=20,
@@ -93,15 +47,15 @@ class PowerLawEstimator(SpeedupEstimator):
     
     def __init__(
         self,
-        eta_max: float = 0.0008,
-        decay_exponent: float = 0.3233,
+        eta_max: float = 0.0002,
+        decay_exponent: float = 0.7630,
     ):
         """
         Initialize PowerLawEstimator.
         
         Args:
-            eta_max: Peak parallel efficiency at R=1 round (default: 0.0008)
-            decay_exponent: Power-law decay exponent p (default: 0.3233)
+            eta_max: Peak parallel efficiency at R=1 round (default: 0.0002)
+            decay_exponent: Power-law decay exponent p (default: 0.7630)
         """
         self._eta_max = float(eta_max)
         self._decay_exponent = float(decay_exponent)
@@ -199,11 +153,6 @@ class PowerLawEstimator(SpeedupEstimator):
         return f"PowerLawEstimator(eta_max={self._eta_max:.4f}, decay_exponent={self._decay_exponent:.4f})"
 
 
-# =============================================================================
-# Calibration
-# =============================================================================
-
-
 def fit_efficiency_power_law(
     measurements: Sequence[Dict[str, float]],
     weight_mode: str = "count",
@@ -268,11 +217,6 @@ def fit_efficiency_power_law(
     }
 
 
-# =============================================================================
-# Estimator Registry
-# =============================================================================
-
-
 class EstimatorRegistry:
     """
     Global registry for speedup estimator plugins.
@@ -313,13 +257,3 @@ class EstimatorRegistry:
 
 # Register default estimator on module import
 EstimatorRegistry.register("power_law", PowerLawEstimator())
-
-
-__all__ = [
-    "EstimatorInput",
-    "SpeedupResult",
-    "SpeedupEstimator",
-    "PowerLawEstimator",
-    "EstimatorRegistry",
-    "fit_efficiency_power_law",
-]

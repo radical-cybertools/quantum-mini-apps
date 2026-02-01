@@ -17,8 +17,8 @@ authors:
   given-names: "Pradeep"
   orcid: "https://orcid.org/0000-0002-1225-4062"
 title: "Quantum Mini Apps"
-version: 0.1.0
+version: 0.2.0
 doi: 
-date-released: 2025-01-04
+date-released: 2026-02-01
 url: "https://github.com/radical-cybertools/quantum-mini-apps"
 repository-code: "https://github.com/radical-cybertools/quantum-mini-apps"

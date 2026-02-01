@@ -1,18 +1,17 @@
 """
-QDreamer v3.0: Resource-Aware Quantum Circuit Cutting Optimization
+QDreamer v0.4.0: Resource-Aware Quantum Circuit Cutting Optimization
 
 Finds optimal circuit cutting configurations based on hardware resources.
 
 Quick Start:
-    >>> from qdreamer import QDreamerCircuitCutting, predict_cutting
+    >>> from qdreamer import QDreamerCircuitCutting
     >>> 
-    >>> # Fast prediction (no Qiskit needed)
-    >>> result = predict_cutting(n_qubits=36, num_workers=8)
-    >>> print(f"Speedup: {result['speedup']:.1f}x with {result['subcircuit_size']}q subcircuits")
-    >>> 
-    >>> # Full optimization with actual circuit
+    >>> # Optimization with circuit (quick=True by default for fast heuristic)
     >>> qdreamer = QDreamerCircuitCutting(executor, circuit)
     >>> allocation = qdreamer.optimize()
+    >>> 
+    >>> # For more accurate Qiskit-based cut finding, use quick=False
+    >>> allocation = qdreamer.optimize(quick=False)
 
 Estimator Calibration:
     >>> from qdreamer import PowerLawEstimator
@@ -24,20 +23,22 @@ Estimator Calibration:
     ... ])
     >>> 
     >>> qdreamer = QDreamerCircuitCutting(executor, circuit, estimator=estimator)
+
+Module Structure:
+    qdreamer/
+    ├── core/           - Shared data models and detectors
+    ├── tools/          - Optimization tools
+    │   └── circuit_cutting_resource_optimizer/
+    │       ├── resource_optimizer.py
+    │       ├── qdreamer_circuit_cutting.py
+    │       └── estimators/
+    └── examples/       - Example scripts (basic, executor, calibration)
 """
 
-from .qdreamer import (
-    QDreamerCircuitCutting,
+# Core data models and utilities
+from .core import (
     ResourceDetector,
     CircuitAnalyzer,
-)
-
-from .resource_optimizer import (
-    ResourceOptimizer,
-    predict_cutting,
-)
-
-from .data_models import (
     ResourceProfile,
     CircuitCharacteristics,
     OptimizedAllocation,
@@ -46,7 +47,10 @@ from .data_models import (
     SpeedupResult,
 )
 
-from .estimators import (
+# Tools - Circuit Cutting Resource Optimizer
+from .tools.circuit_cutting_resource_optimizer import (
+    QDreamerCircuitCutting,
+    ResourceOptimizer,
     SpeedupEstimator,
     PowerLawEstimator,
     EstimatorRegistry,
@@ -57,7 +61,6 @@ __all__ = [
     # Main API
     'QDreamerCircuitCutting',
     'ResourceOptimizer',
-    'predict_cutting',
     
     # Estimators
     'SpeedupEstimator',
@@ -78,4 +81,4 @@ __all__ = [
     'CircuitAnalyzer',
 ]
 
-__version__ = '0.2.0'
+__version__ = '0.4.0'

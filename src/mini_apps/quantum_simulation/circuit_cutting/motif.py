@@ -15,6 +15,9 @@ import fire
 import numpy as np
 import ray  # Add this import statement
 
+# Log GPU assignment once per worker process for debugging.
+GPU_DEBUG_LOGGED = False
+
 # Qiskit imports
 from qiskit.circuit.library import EfficientSU2
 from qiskit.primitives import PrimitiveResult
@@ -116,6 +119,36 @@ def execute_sampler(backend_options, label, subsystem_subexpts,
         from qiskit.converters import circuit_to_dag
 
         task_start_time = time.time()  # Track total task time
+        global GPU_DEBUG_LOGGED
+        if not GPU_DEBUG_LOGGED:
+            GPU_DEBUG_LOGGED = True
+            try:
+                assigned_gpu_ids = ray.get_gpu_ids()
+                assigned_resources = ray.get_runtime_context().get_assigned_resources()
+            except Exception as e:
+                assigned_gpu_ids = f"error:{e}"
+                assigned_resources = {}
+            print(
+                "[RAY_GPU_DEBUG] "
+                f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}, "
+                f"RAY_EXPERIMENTAL_NOSET_CUDA_VISIBLE_DEVICES="
+                f"{os.environ.get('RAY_EXPERIMENTAL_NOSET_CUDA_VISIBLE_DEVICES')}, "
+                f"RAY_OVERRIDE_RESOURCES={os.environ.get('RAY_OVERRIDE_RESOURCES')}, "
+                f"ray_gpu_ids={assigned_gpu_ids}, "
+                f"assigned_resources={assigned_resources}"
+            )
+        else:
+            try:
+                assigned_gpu_ids = ray.get_gpu_ids()
+            except Exception:
+                assigned_gpu_ids = []
+
+        # If Ray assigned GPUs, pin this task to them explicitly
+        if assigned_gpu_ids:
+            os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(
+                str(int(gpu_id)) if isinstance(gpu_id, float) else str(gpu_id)
+                for gpu_id in assigned_gpu_ids
+            )
 
         # Log circuit characteristics when execution starts
         circuit = subsystem_subexpts[0]
@@ -371,7 +404,7 @@ class CircuitCuttingBuilder:
         self.subcircuit_size = None
         self.base_qubits = None
         self.observables = None
-        self.scale_factor = None
+        self.scale_factor = 1  # Default to 1 (no scaling)
         self.full_circuit_qiskit_options = None
         self.circuit_cutting_qiskit_options = None
         self.full_circuit_only = False

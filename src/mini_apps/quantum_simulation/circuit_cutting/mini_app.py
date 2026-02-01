@@ -115,7 +115,7 @@ def create_cluster_info_perlmutter(nodes, cores=128, gpus=4):
             "queue": "premium",
             #"queue": "regular",
             "walltime": 30,            
-            "project": "m4408",
+            "project": "<YOUR_PROJECT_ID>",  # Set to your NERSC/HPC project allocation
             "scheduler_script_commands": ["#SBATCH --constraint=gpu&hbm80g",
                                             "#SBATCH --gpus-per-task=1",
                                             f"#SBATCH --ntasks-per-node={gpus}",
